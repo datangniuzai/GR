@@ -1,0 +1,40 @@
+{
+  "name": "volunteer_experiment_info",
+  "description": "Details of subjects and experimental process",
+  "Note": "The following description of time is in hours.",
+  "subjects_info":
+  {
+    "name": "li_jiaxuan/李嘉轩",
+    "age": 25,
+    "gender": "male",
+    "measured_arm": "left",
+    "diet": "Normal",
+    "weekly_exercise_duration": 3.5,
+    "subject_conditions":
+    {
+      "neurological_diseases": "None",
+      "physical_conditions": "Healthy",
+      "sleep":
+      {
+        "previous_night_sleep_duration": 7.5,
+        "bedtime": "2024-11-17T23:00:00"
+      },
+      "diet": "Normal",
+      "weekly_exercise_duration": 3.5
+    }
+  },
+    "experiment_info":
+    {
+      "gesture_sequence":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],
+      "gesture_read_count_per_instance": 20,
+      "read_duration_per_instance": 60,
+      "experiment_time":
+      {
+        "start_time": "2024-11-18T08:00:00",
+        "end_time": "2024-11-18T10:00:00",
+        "break_duration": 15
+      }
+    }
+}
+
+

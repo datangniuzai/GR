@@ -1,0 +1,20 @@
+{
+  "name": "train_config",
+  "description": "This json is used to adjust various parameters of training.",
+  "used_parameters": {
+    "window_size": 100,
+    "step_size": 10,
+    "window_size_little": 50,
+    "step_size_little": 5,
+    "epochs": 20,
+    "scaling": 1.5,
+    "train_nums": [1,2,3,4,5,6,7,8,9,10,11,12],
+    "val_nums": [13,14,15,16],
+    "test_nums": [17,18,19,20]
+  },
+    "not_used_parameters": {
+    "train_num": 11,
+    "val_num": 4,
+    "test_num": 4
+  }
+}

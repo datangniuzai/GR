@@ -6,66 +6,11 @@
 # @Software: PyCharm
 
 import os
-import yaml
 import datetime
-import config
+import config as cf
 import numpy as np
 import tensorflow as tf
 from data_reading import read_tfrecord
-from config import model
-
-def info_folder_create():
-    # 获取当前时间并生成文件夹名称
-    current_time = datetime.datetime.now()
-    folder_name = current_time.strftime("%Y-%m-%d_%H-%M-%S")
-    os.makedirs(folder_name)
-    os.makedirs(os.path.join(folder_name, 'data'))
-    os.makedirs(os.path.join(folder_name, 'output_data'))
-    os.makedirs(os.path.join(folder_name, 'picture'))
-    # 生成文件夹路径和名称
-    folder_path = os.path.abspath(folder_name)
-    print(f"创建了相关文件夹: {folder_path}")
-    folder_basename = os.path.basename(folder_path)
-    config.folder_path = folder_basename + "/"
-
-    # 获取志愿者信息
-    while True:
-        use_hand = input("请输入测量的手臂[1.右手/2.左手]: ")
-        if use_hand == "1":
-            hand_preference = "右手"
-            break
-        elif use_hand == "2":
-            hand_preference = "左手"
-            break
-        else:
-            print("请输入'1'或'2'")
-
-    while True:
-        gender_num = input("请输入志愿者性别[1.男性/2.女性]: ")
-        if gender_num == "1":
-            gender = "男性"
-            break
-        elif gender_num == "2":
-            gender = "女性"
-            break
-        else:
-            print("请输入'1'或'2'")
-
-    age = int(input("请输入志愿者年龄: "))
-
-    # 保存信息到 YAML 文件
-    volunteer_info = {
-        'age': age,
-        'gender': gender,
-        'hand_preference': hand_preference,
-        'gesture_num': config.gesture_num,
-        'turn_read_sum': config.turn_read_sum,
-        'time_preread': config.time_preread,
-    }
-    info_file_path = os.path.join(folder_name, 'vol&ges_info.yaml')
-    with open(info_file_path, 'w', encoding='utf-8') as file:
-        yaml.dump(volunteer_info, file, allow_unicode=True)
-    print(f"志愿者信息已保存至 {info_file_path}")
 
 def model_train(self):
 

@@ -10,21 +10,22 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 
-import config
-from data_reading import read_tfrecord
-from filtering import bandpass_and_notch_filter
 import config as cf
+from filtering import bandpass_and_notch_filter
+from data_reading import load_tfrecord
 
 def time_features(data):
     """
-    只提取时域特征，加小窗，特征顺序：MAV，RMS，MSE，过零点数，Willison幅值
+    只提取时域特征，加小窗，特征顺序：MAV，RMS，MSE，过零点数，WAMP
     """
     num_channels, signal_length = data.shape
     num_windows = (signal_length - cf.window_size_little) // cf.step_size_little + 1
     features = []
 
     for i in range(num_windows):
+
         start = i * cf.step_size_little
+
         end = start + cf.window_size_little
         windowed_data = data[:, start:end]
 
@@ -33,9 +34,9 @@ def time_features(data):
         max_possible_zero_crossings = cf.step_size_little - 1
         max_possible_willison_amplitudes = cf.step_size_little - 1
 
-        MAV = np.mean(np.abs(windowed_data), axis=1)
-        RMS = np.sqrt(np.mean(windowed_data ** 2, axis=1)) / max_possible_rms
-        MSE = np.mean((windowed_data - np.sqrt(np.mean(windowed_data ** 2, axis=0))) ** 2, axis=1) / max_possible_mse
+        mav = np.mean(np.abs(windowed_data), axis=1)
+        rms = np.sqrt(np.mean(windowed_data ** 2, axis=1)) / max_possible_rms
+        mse = np.mean((windowed_data - np.sqrt(np.mean(windowed_data ** 2, axis=0))) ** 2, axis=1) / max_possible_mse
 
         # 过零点数
         zero_crossings = []
@@ -50,7 +51,7 @@ def time_features(data):
             differences = np.diff(channel)
             willison_amplitude = np.sum(np.abs(differences) > threshold)
             willison_amplitudes.append(willison_amplitude / max_possible_willison_amplitudes)
-        feature = np.array([MAV, RMS, MSE, np.array(zero_crossings), np.array(willison_amplitudes)])
+        feature = np.array([mav, rms, mse, np.array(zero_crossings), np.array(willison_amplitudes)])
         features.append(feature.T)
     features = np.array(features)
     return features
@@ -66,9 +67,9 @@ def time_frequency_features(data):
     max_possible_willison_amplitudes = len_data - 1
     nyquist_frequency = cf.sample_rate / 2
 
-    MAV = np.mean(np.abs(data), axis=1)
-    RMS = np.sqrt(np.mean(data ** 2, axis=1)) / max_possible_rms
-    MSE = np.mean((data - np.sqrt(np.mean(data ** 2, axis=0))) ** 2, axis=1) / max_possible_mse
+    mav = np.mean(np.abs(data), axis=1)
+    rms = np.sqrt(np.mean(data ** 2, axis=1)) / max_possible_rms
+    mse = np.mean((data - np.sqrt(np.mean(data ** 2, axis=0))) ** 2, axis=1) / max_possible_mse
 
     # 过零点数
     zero_crossings = []
@@ -115,205 +116,120 @@ def time_frequency_features(data):
         fr = high_freq_energy / low_freq_energy if low_freq_energy != 0 else float('inf')
         fr_values.append(fr)
     feature = (
-        np.array([MAV, RMS, MSE, np.array(zero_crossings), np.array(willison_amplitudes), np.array(mdf_values),
+        np.array([mav, rms, mse, np.array(zero_crossings), np.array(willison_amplitudes), np.array(mdf_values),
                   np.array(mnf_values), np.array(fr_values)]))
     return feature
-
-def feature_tract_save(data):
-    """
-    只提取时域特征，加小窗，特征顺序：MAV，RMS，MSE，过零点数，Willison幅值
-    """
-    num_channels, signal_length = data.shape
-    num_windows = (signal_length - cf.window_size_little) // cf.step_size_little + 1
-    features = []
-
-    for i in range(num_windows):
-        start = i * cf.step_size_little
-        end = start + cf.window_size_little
-        windowed_data = data[:, start:end]
-
-        max_possible_rms = np.max(windowed_data) / 2
-        max_possible_mse = (np.max(windowed_data) / 2) ** 2
-        max_possible_zero_crossings = cf.step_size_little - 1
-        max_possible_willison_amplitudes = cf.step_size_little - 1
-
-        MAV = np.mean(np.abs(windowed_data), axis=1)
-        RMS = np.sqrt(np.mean(windowed_data ** 2, axis=1)) / max_possible_rms
-        MSE = np.mean((windowed_data - np.sqrt(np.mean(windowed_data ** 2, axis=0))) ** 2, axis=1) / max_possible_mse
-
-        # 过零点数
-        zero_crossings = []
-        for channel in windowed_data:
-            crossings = (np.sum(np.diff(np.sign(channel)) != 0)) / cf.step_size_little
-            zero_crossings.append(crossings / max_possible_zero_crossings)
-
-        # Willison幅值
-        threshold = 20 / cf.scaling
-        willison_amplitudes = []
-        for channel in windowed_data:
-            differences = np.diff(channel)
-            willison_amplitude = np.sum(np.abs(differences) > threshold)
-            willison_amplitudes.append(willison_amplitude / max_possible_willison_amplitudes)
-        feature = np.array([MAV, RMS, MSE, np.array(zero_crossings), np.array(willison_amplitudes)])
-        features.append(feature)
-    features = np.array(features)
-    return features
 
 def online_dataset():
     print("正在处理数据，请稍等")
     print(
-        f"取第{list(map(lambda x: x + 1, cf.train_nums))}次采集的数据作为训练集，"
-        f"取第{list(map(lambda x: x + 1, cf.test_nums))}次采集的数据作为测试集，"
-        f"取第{list(map(lambda x: x + 1, cf.val_nums))}次采集的数据作为验证集")
+        f"取第{cf.train_nums}次采集的数据作为训练集，\n"
+        f"取第{cf.test_nums}次采集的数据作为测试集，\n"
+        f"取第{cf.val_nums}次采集的数据作为验证集\n"
+    )
 
     for gesture_number in cf.gesture:
-        path = cf.folder_path + f'output_data/sEMG_data{gesture_number}.csv'
+        path = cf.folder_path + f'original_data/sEMG_data{gesture_number}.csv'
         df = pd.read_csv(path, header=None).to_numpy().T / cf.scaling
-        # 提取特征
-        window_data_feature_train = []
-        window_data_label_train = []
-        window_data_time_preread_index_train = []
-        window_data_window_index_train = []
-        window_data_feature_test = []
-        window_data_label_test = []
-        window_data_time_preread_index_test = []
-        window_data_window_index_test = []
-        window_data_feature_val = []
-        window_data_label_val = []
-        window_data_time_preread_index_val = []
-        window_data_window_index_val = []
-        for i in range(cf.turn_read_sum):
-            data = df[:, i * (cf.time_preread * cf.sample_rate):(i + 1) * (
-                    cf.time_preread * cf.sample_rate)]
-            if i in cf.test_nums:
-                for j in range(0, data.shape[1] - cf.window_size + 1, cf.step_size):
-                    window_data = data[:, j:j + cf.window_size]
-                    window_data = bandpass_and_notch_filter(window_data)
-                    window_data_feature_test.append(time_features(window_data))
-                    window_data_label_test.append(gesture_number)
-                    window_data_time_preread_index_test.append(i)
-                    window_data_window_index_test.append(j)
-            elif i in cf.val_nums:
-                for j in range(0, data.shape[1] - cf.window_size + 1, cf.step_size):
-                    window_data = data[:, j:j + cf.window_size]
-                    window_data = bandpass_and_notch_filter(window_data)
-                    window_data_feature_val.append(time_features(window_data))
-                    window_data_label_val.append(gesture_number)
-                    window_data_time_preread_index_val.append(i)
-                    window_data_window_index_val.append(j)
-            # 窗口滑动计数
-            elif i in cf.train_nums:
-                for j in range(0, data.shape[1] - cf.window_size + 1, cf.step_size):
-                    window_data = data[:, j:j + cf.window_size]
-                    window_data = bandpass_and_notch_filter(window_data)
-                    window_data_feature_train.append(time_features(window_data))
-                    window_data_label_train.append(gesture_number)
-                    window_data_time_preread_index_train.append(i)
-                    window_data_window_index_train.append(j)
 
-        # 保存训练集为CSV文件
-        train_data = np.array(window_data_feature_train)
-        train_data_channel_0 = train_data[:, :, 25, :]
-        train_data_channel_0_flat = train_data_channel_0.reshape(-1, train_data_channel_0.shape[-1])
-        train_df = pd.DataFrame(train_data_channel_0_flat)
-        train_df.to_csv(cf.folder_path + f'data/data_{gesture_number}_train_channel_0.csv', index=False)
+        for dataset_type in ['train', 'test', 'val']:
+            dataset_establish(df, gesture_number, dataset_type)
+        print("f{gesture_number}号手势处理完毕")
 
+def dataset_establish(df, gesture_number, dataset_type):
+    """
+    通用数据处理函数，用于训练集、测试集和验证集的特征提取和保存
+    :param df: 输入信号
+    :param gesture_number: 手势编号
+    :param dataset_type: 数据集类型（'train'/'test'/'val'）
+    :return: 数据集的element_spec
+    """
+    window_data_feature = []
+    window_data_label = []
+    window_data_time_preread_index = []
+    window_data_window_index = []
 
-        save_path = cf.folder_path + "data"
-        # 训练集数据集建立
-        window_data_feature_train_tensor = tf.convert_to_tensor(window_data_feature_train, dtype=tf.float32)
-        label_train_tensor = tf.convert_to_tensor(window_data_label_train, dtype=tf.int32)
-        time_preread_index_train_tensor = tf.convert_to_tensor(window_data_time_preread_index_train, dtype=tf.int32)
-        window_index_train_tensor = tf.convert_to_tensor(window_data_window_index_train, dtype=tf.int32)
-        dataset_train = tf.data.Dataset.from_tensor_slices((window_data_feature_train_tensor, label_train_tensor,
-                                                            time_preread_index_train_tensor,
-                                                            window_index_train_tensor))
-        with tf.io.TFRecordWriter(os.path.join(save_path, f'data_{gesture_number}_train.tfrecord')) as writer:
-            for window, label, time_preread_index, window_index in dataset_train:
-                feature = {
-                    'window': tf.train.Feature(float_list=tf.train.FloatList(value=window.numpy().flatten())),
-                    'label': tf.train.Feature(int64_list=tf.train.Int64List(value=[label.numpy()])),
-                    'time_preread_index': tf.train.Feature(
-                        int64_list=tf.train.Int64List(value=[time_preread_index.numpy()])),
-                    'window_index': tf.train.Feature(int64_list=tf.train.Int64List(value=[window_index.numpy()]))
-                }
-                example = tf.train.Example(features=tf.train.Features(feature=feature))
-                writer.write(example.SerializeToString())
-        # 测试集数据集建立
-        window_data_feature_test_tensor = tf.convert_to_tensor(window_data_feature_test, dtype=tf.float32)
-        label_test_tensor = tf.convert_to_tensor(window_data_label_test, dtype=tf.int32)
-        time_preread_index_test_tensor = tf.convert_to_tensor(window_data_time_preread_index_test, dtype=tf.int32)
-        window_index_test_tensor = tf.convert_to_tensor(window_data_window_index_test, dtype=tf.int32)
-        dataset_test = tf.data.Dataset.from_tensor_slices((window_data_feature_test_tensor, label_test_tensor,
-                                                           time_preread_index_test_tensor,
-                                                           window_index_test_tensor))
-        with tf.io.TFRecordWriter(os.path.join(save_path, f'data_{gesture_number}_test.tfrecord')) as writer:
-            for window, label, time_preread_index, window_index in dataset_test:
-                feature = {
-                    'window': tf.train.Feature(float_list=tf.train.FloatList(value=window.numpy().flatten())),
-                    'label': tf.train.Feature(int64_list=tf.train.Int64List(value=[label.numpy()])),
-                    'time_preread_index': tf.train.Feature(
-                        int64_list=tf.train.Int64List(value=[time_preread_index.numpy()])),
-                    'window_index': tf.train.Feature(int64_list=tf.train.Int64List(value=[window_index.numpy()]))
-                }
-                example = tf.train.Example(features=tf.train.Features(feature=feature))
-                writer.write(example.SerializeToString())
-        # 验证集数据集建立
-        window_data_feature_val_tensor = tf.convert_to_tensor(window_data_feature_val, dtype=tf.float32)
-        label_val_tensor = tf.convert_to_tensor(window_data_label_val, dtype=tf.int32)
-        time_preread_index_val_tensor = tf.convert_to_tensor(window_data_time_preread_index_val, dtype=tf.int32)
-        window_index_val_tensor = tf.convert_to_tensor(window_data_window_index_val, dtype=tf.int32)
-        dataset_val = tf.data.Dataset.from_tensor_slices((window_data_feature_val_tensor, label_val_tensor,
-                                                          time_preread_index_val_tensor, window_index_val_tensor))
-        with tf.io.TFRecordWriter(os.path.join(save_path, f'data_{gesture_number}_val.tfrecord')) as writer:
-            for window, label, time_preread_index, window_index in dataset_val:
-                feature = {
-                    'window': tf.train.Feature(float_list=tf.train.FloatList(value=window.numpy().flatten())),
-                    'label': tf.train.Feature(int64_list=tf.train.Int64List(value=[label.numpy()])),
-                    'time_preread_index': tf.train.Feature(
-                        int64_list=tf.train.Int64List(value=[time_preread_index.numpy()])),
-                    'window_index': tf.train.Feature(int64_list=tf.train.Int64List(value=[window_index.numpy()]))
-                }
-                example = tf.train.Example(features=tf.train.Features(feature=feature))
-                writer.write(example.SerializeToString())
-        print(f"{gesture_number}号手势数据库中的元素格式:", dataset_train.element_spec)
-    config.feature_shape = window_data_feature_train[1].shape
+    for i in range(cf.turn_read_sum):
+        if i in getattr(cf, f"{dataset_type}_nums"):
+            data = df[:, i * (cf.time_preread * cf.sample_rate):
+                         (i + 1) * (cf.time_preread * cf.sample_rate)]
+            for j in range(0, data.shape[1] - cf.window_size + 1, cf.step_size):
+                window_data = data[:, j:j + cf.window_size]
+                window_data = bandpass_and_notch_filter(window_data)
+                window_data_feature.append(time_features(window_data))
+                window_data_label.append(gesture_number)
+                window_data_time_preread_index.append(i)
+                window_data_window_index.append(j)
 
-def online_data_contact():
-    print("数据集整理开始")
-    for turn in ["test", "train", "val"]:
-        window_feature_data = []
-        labels = []
-        time_preread_indices = []
-        window_indices = []
+    window_data_feature_tensor = tf.convert_to_tensor(window_data_feature, dtype=tf.float32)
+    label_tensor = tf.convert_to_tensor(window_data_label, dtype=tf.uint8)
+    time_preread_index_tensor = tf.convert_to_tensor(window_data_time_preread_index, dtype=tf.uint8)
+    window_index_tensor = tf.convert_to_tensor(window_data_window_index, dtype=tf.uint8)
+    dataset = tf.data.Dataset.from_tensor_slices((window_data_feature_tensor, label_tensor,
+                                                  time_preread_index_tensor, window_index_tensor))
+    save_path = os.path.join(cf.folder_path,"processed_data")
+    os.makedirs(save_path, exist_ok=True)
+    tfrecord_path = os.path.join(save_path, f"data_{gesture_number}_{dataset_type}.tfrecord")
+    with tf.io.TFRecordWriter(tfrecord_path) as writer:
+        for window, label, time_preread_index, window_index in dataset:
+            feature = {
+                'window': tf.train.Feature(float_list=tf.train.FloatList(value=window.numpy().flatten())),
+                'label': tf.train.Feature(int64_list=tf.train.Int64List(value=[label.numpy()])),
+                'time_preread_index': tf.train.Feature(
+                    int64_list=tf.train.Int64List(value=[time_preread_index.numpy()])),
+                'window_index': tf.train.Feature(int64_list=tf.train.Int64List(value=[window_index.numpy()])),
+            }
+            example = tf.train.Example(features=tf.train.Features(feature=feature))
+            writer.write(example.SerializeToString())
+
+def dataset_connect():
+
+    for dataset_type in ['train', 'test', 'val']:
+
+        merged_dataset = None
+
         for gesture_number in cf.gesture:
-            data, label, time_preread_index, window_index = read_tfrecord(
-                cf.folder_path + f"data/data_{gesture_number}_{turn}.tfrecord")
-            window_feature_data = window_feature_data + data
-            labels = labels + label
-            time_preread_indices = time_preread_indices + time_preread_index
-            window_indices = window_indices + window_index
-        window_data_feature_tensor = tf.convert_to_tensor(window_feature_data, dtype=tf.float32)
-        label_tensor = tf.convert_to_tensor(labels, dtype=tf.int32)
-        time_preread_index_tensor = tf.convert_to_tensor(time_preread_indices, dtype=tf.int32)
-        window_index_tensor = tf.convert_to_tensor(window_indices, dtype=tf.int32)
-        dataset = tf.data.Dataset.from_tensor_slices(
-            (window_data_feature_tensor, label_tensor, time_preread_index_tensor, window_index_tensor))
-        # 确保保存路径存在
-        save_path = cf.folder_path + "data"
-        with tf.io.TFRecordWriter(os.path.join(save_path, f'data_contact_{turn}.tfrecord')) as writer:
-            for window, label, time_preread_index, window_index in dataset:
-                feature = {
-                    'window': tf.train.Feature(float_list=tf.train.FloatList(value=window.numpy().flatten())),
-                    'label': tf.train.Feature(int64_list=tf.train.Int64List(value=[label.numpy()])),
-                    'time_preread_index': tf.train.Feature(
-                        int64_list=tf.train.Int64List(value=[time_preread_index.numpy()])),
-                    'window_index': tf.train.Feature(int64_list=tf.train.Int64List(value=[window_index.numpy()]))
-                }
-                example = tf.train.Example(features=tf.train.Features(feature=feature))
-                writer.write(example.SerializeToString())
-        # 打印当前数据集的个数
-        print(f"{turn} 数据集的个数: {len(labels)}")
-    print("数据处理完毕，开始训练模型")
+
+            dataset= load_tfrecord(cf.folder_path + f"processed_data/data_{gesture_number}_{dataset_type}.tfrecord")
+
+            if merged_dataset is None:
+                merged_dataset = dataset
+            else:
+                merged_dataset = merged_dataset.concatenate(dataset)
+
+        tfrecord_save_path = os.path.join(cf.folder_path,f"processed_data/data_contact_{dataset_type}.tfrecord")
+        save_tfrecord(merged_dataset,tfrecord_save_path)
+        print(f"[{dataset_type}]数据已合并并保存在[{tfrecord_save_path}]")
+
+def save_tfrecord(dataset,tfrecord_save_path):
+    """
+    将数据集保存为 TFRecord 文件。
+
+    参数：
+    dataset (iterable)：包含窗口数据、标签、时间索引和窗口索引的迭代器。
+    tfrecord_save_path (str)：保存 TFRecord 文件的路径。
+
+    功能：
+    将数据集中的每个项（窗口数据、标签等）转换为 `tf.train.Example` 格式并写入指定的 TFRecord 文件。
+    """
+
+    with tf.io.TFRecordWriter(tfrecord_save_path) as writer:
+        for window, label, time_preread_index, window_index in dataset:
+            feature = {
+                'window': tf.train.Feature(
+                    float_list=tf.train.FloatList(value=window.numpy().flatten())),
+                'label': tf.train.Feature(
+                    int64_list=tf.train.Int64List(value=[label.numpy().item()])),
+                'time_preread_index': tf.train.Feature(
+                    int64_list=tf.train.Int64List(value=[time_preread_index.numpy().item()])),
+                'window_index': tf.train.Feature(
+                    int64_list=tf.train.Int64List(value=[window_index.numpy().item()])),
+            }
+            example = tf.train.Example(features=tf.train.Features(feature=feature))
+            writer.write(example.SerializeToString())
+
+
+
+
 
 

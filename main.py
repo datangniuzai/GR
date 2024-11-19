@@ -5,12 +5,9 @@
 # @Software: PyCharm
 
 import config as cf
-import data_reading
-from data_reading import online_data_read
-from feature_extraction import online_data_contact
+from feature_extraction import online_dataset,dataset_connect
 
 if __name__ == '__main__':
-
-    cf.folder_path = "data/"
     cf.config_read()
-    online_data_read()
+    online_dataset()
+    dataset_connect()

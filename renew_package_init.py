@@ -28,7 +28,7 @@ def generate_init_file(package_dir):
     with open(init_file, 'w', encoding='utf-8') as f:
         f.write('\n'.join(content_lines))
         f.write('\n')
-
-# 替换 package_dir 为你的包路径
-package_dir = "my_models"
-generate_init_file(package_dir)
+if __name__ == '__main__':
+    # 替换 package_dir 为你的包路径
+    package_dir = "data_reading"
+    generate_init_file(package_dir)

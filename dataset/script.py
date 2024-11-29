@@ -129,14 +129,14 @@ def online_dataset():
     )
 
     for gesture_number in cf.gesture:
-        path = cf.folder_path + f'original_data/sEMG_data{gesture_number}.csv'
+        path = cf.data_path + f'original_data/sEMG_data{gesture_number}.csv'
         df = pd.read_csv(path, header=None).to_numpy().T / cf.scaling
 
         for dataset_type in ['train', 'test', 'val']:
             dataset_establish(df, gesture_number, dataset_type)
-        print("f{gesture_number}号手势处理完毕")
+        print(f"{gesture_number}号手势数据处理完毕")
 
-def dataset_establish(df, gesture_number, dataset_type):
+def dataset_establish(df: np.ndarray, gesture_number:int, dataset_type :str):
     """
     通用数据处理函数，用于训练集、测试集和验证集的特征提取和保存
     :param df: 输入信号
@@ -167,7 +167,7 @@ def dataset_establish(df, gesture_number, dataset_type):
     window_index_tensor = tf.convert_to_tensor(window_data_window_index, dtype=tf.uint8)
     dataset = tf.data.Dataset.from_tensor_slices((window_data_feature_tensor, label_tensor,
                                                   time_preread_index_tensor, window_index_tensor))
-    save_path = os.path.join(cf.folder_path,"processed_data")
+    save_path = os.path.join(cf.data_path,"processed_data")
     os.makedirs(save_path, exist_ok=True)
     tfrecord_path = os.path.join(save_path, f"data_{gesture_number}_{dataset_type}.tfrecord")
     with tf.io.TFRecordWriter(tfrecord_path) as writer:
@@ -190,18 +190,18 @@ def dataset_connect():
 
         for gesture_number in cf.gesture:
 
-            dataset= load_tfrecord(cf.folder_path + f"processed_data/data_{gesture_number}_{dataset_type}.tfrecord")
+            dataset= load_tfrecord(cf.data_path + f"processed_data/data_{gesture_number}_{dataset_type}.tfrecord")
 
             if merged_dataset is None:
                 merged_dataset = dataset
             else:
                 merged_dataset = merged_dataset.concatenate(dataset)
 
-        tfrecord_save_path = os.path.join(cf.folder_path,f"processed_data/data_contact_{dataset_type}.tfrecord")
+        tfrecord_save_path = os.path.join(cf.data_path,f"processed_data/data_contact_{dataset_type}.tfrecord")
         save_tfrecord(merged_dataset,tfrecord_save_path)
         print(f"[{dataset_type}]数据已合并并保存在[{tfrecord_save_path}]")
 
-def save_tfrecord(dataset,tfrecord_save_path):
+def save_tfrecord(dataset :tf.data.Dataset,tfrecord_save_path:str):
     """
     将数据集保存为 TFRecord 文件。
 
@@ -212,7 +212,6 @@ def save_tfrecord(dataset,tfrecord_save_path):
     功能：
     将数据集中的每个项（窗口数据、标签等）转换为 `tf.train.Example` 格式并写入指定的 TFRecord 文件。
     """
-
     with tf.io.TFRecordWriter(tfrecord_save_path) as writer:
         for window, label, time_preread_index, window_index in dataset:
             feature = {

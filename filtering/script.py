@@ -5,59 +5,61 @@
 # @File : script.py
 # @Software: PyCharm
 
-
 import numpy as np
 import pandas as pd
 from scipy import signal
 import config as cf
 
-def bandpass_and_notch_filter(data):
+# Global definition of filter coefficients
+
+# Bandpass filter (25Hz - 350Hz)
+SOS_BANDPASS = signal.butter(16, [25, 350], analog=False, btype='band', output='sos', fs=cf.sample_rate)
+
+# Notch filter coefficients (50Hz, 100Hz, 150Hz, 200Hz, 250Hz)
+NOTCH_FILTERS = [
+    signal.iirnotch(freq, 50, cf.sample_rate) for freq in [50, 100, 150, 200, 250]
+]
+
+def bandpass_and_notch_filter(data:np.ndarray):
     """
-    :param data: 要进行滤波的矩阵,行为通道数，列为采样点数
-    :return: 滤波后的矩阵
+    Applies bandpass filtering and multiple notch filtering to the input data.
+
+    :param data: Input matrix where rows represent channels and columns represent sampled data points.
+    :return: Filtered matrix after applying bandpass and notch filters.
     """
-    channels = data.shape[0]  # 获取通道数
-    N = data.shape[1]  # 获取数据列数
-    # 对每一个通道的数据应用滤波器
-    filtered_data = np.zeros((channels, N))
-    # 设置带通滤波器
-    sos = signal.butter(16, [25, 350], analog=False, btype='band', output='sos', fs=cf.sample_rate)
+    channels, num_samples = data.shape
+
+    # Initialize output data
+    filtered_data = np.zeros((channels, num_samples))
+
+    # Apply filtering to each channel
     for i in range(channels):
-        filtered_data[i, :] = signal.sosfiltfilt(sos, data[i, :])
-    # 应用陷波滤波器
-    b, a = signal.iirnotch(50, 50, cf.sample_rate)
-    for i in range(channels):
-        filtered_data[i, :] = signal.filtfilt(b, a, filtered_data[i, :])
-    b, a = signal.iirnotch(100, 50, cf.sample_rate)
-    for i in range(channels):
-        filtered_data[i, :] = signal.filtfilt(b, a, filtered_data[i, :])
-    b, a = signal.iirnotch(150, 50, cf.sample_rate)
-    for i in range(channels):
-        filtered_data[i, :] = signal.filtfilt(b, a, filtered_data[i, :])
-    b, a = signal.iirnotch(200, 50, cf.sample_rate)
-    for i in range(channels):
-        filtered_data[i, :] = signal.filtfilt(b, a, filtered_data[i, :])
-    b, a = signal.iirnotch(250, 50, cf.sample_rate)
-    for i in range(channels):
-        filtered_data[i, :] = signal.filtfilt(b, a, filtered_data[i, :])
+
+        filtered_data[i, :] = signal.sosfiltfilt(SOS_BANDPASS, data[i, :])
+
+        for b, a in NOTCH_FILTERS:
+            filtered_data[i, :] = signal.filtfilt(b, a, filtered_data[i, :])
+
     return filtered_data
 
 def filter_and_save_data():
     """
-    将滤波后的数据进行保存
+    Save the filtered data.
     """
     for gesture_number in cf.gesture:
-        # 构造文件路径
-        input_path = cf.folder_path + f'output_data/sEMG_data{gesture_number}.csv'
-        output_path = cf.folder_path + f"process_data/filtered_data{gesture_number}.csv"
-        # 读取数据
+
+        input_path = cf.data_path + f'output_data/sEMG_data{gesture_number}.csv'
+        output_path = cf.data_path + f"process_data/filtered_data{gesture_number}.csv"
+
         df = pd.read_csv(input_path, header=None).to_numpy().T
+
         for i in range(cf.turn_read_sum):
+
             filter_pro_data = df[:,i * (cf.time_preread * cf.sample_rate):(i + 1) * (cf.time_preread * cf.sample_rate)]
-            # 滤波
+
             filtered_data = bandpass_and_notch_filter(filter_pro_data)
-            # 滤波数据
-            # 保存滤波后的数据
+
             with open(output_path, 'a') as f:
                 np.savetxt(f, filtered_data.T, delimiter=',', fmt='%.6f')
+
         print(f"{gesture_number}号手势数据已处理完毕")

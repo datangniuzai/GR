@@ -4,10 +4,18 @@
 # @File : script.py
 # @Software: PyCharm
 
+import time
 import config as cf
-from feature_extraction import online_dataset,dataset_connect
+from dataset import online_dataset,dataset_connect
+from model_file import TCCNN_model_creat
+from train_process import model_train,Plot_matrix,Plot_loos_acc_matrix_test
+
 
 if __name__ == '__main__':
     cf.config_read()
-    online_dataset()
-    dataset_connect()
+    # cf.start_time = time.time()
+    # online_dataset()
+    # dataset_connect()
+    cf.model = TCCNN_model_creat()
+    # cf.end_time = time.time()
+    Plot_loos_acc_matrix_test()

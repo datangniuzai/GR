@@ -1,21 +1,24 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# @Time : 2024/11/14 17:38
+# @Time : 2024/11/19 21:14
 # @Author : 李 嘉 轩
-# @File : tccnn.py
+# @File : my_layers.py
 # @Software: PyCharm
 
+import pandas as pd
+import config as cf
 import tensorflow as tf
 from tensorflow.keras.layers import Layer, Conv2D, BatchNormalization, Activation, Dropout
 
-@tf.keras.utils.register_keras_serializable(package="Custom", name="TCCNN_V1")
-class TCCNN_V1(Layer):
-    '''
+@tf.keras.utils.register_keras_serializable(package="Custom", name="TccnnV1")
+class TccnnV1(Layer):
+    """
     Calculating new features by fusing adjacent time steps.
     --------
     Input:  (batch_size, time_steps   , channels , features )
     Output: (batch_size, time_steps , channels , filters  )
-    '''
+
+    """
 
     def __init__(self,
                  filters,
@@ -25,7 +28,7 @@ class TCCNN_V1(Layer):
                  use_batch_norm=True,
                  dropout_rate=0.3, **kwargs):
 
-        super(TCCNN_V1, self).__init__(**kwargs)
+        super(TccnnV1, self).__init__(**kwargs)
 
         # 滤波器的数量
         self.filters = filters
@@ -124,16 +127,29 @@ class TCCNN_V1(Layer):
 
         return padded_inputs
 
+    def get_config(self):
 
-@tf.keras.utils.register_keras_serializable(package="Custom", name="TCCNN_V2")
-class TCCNN_V2(Layer):
-    '''
+        config = super().get_config()
+
+        config.update({
+            "filters": self.filters,
+            "kernel_size": self.kernel_size,
+            "activation": self.activation,
+            "strides": self.strides,
+            "use_batch_norm": self.use_batch_norm,
+            "dropout_rate": self.dropout_rate,
+        })
+
+        return config
+
+@tf.keras.utils.register_keras_serializable(package="Custom", name="TccnnV2")
+class TccnnV2(Layer):
+    """
     Calculating new features by fusing adjacent time steps.
     --------
     Input:  (batch_size, time_steps, channels, features)
     Output: (batch_size, time_steps, channels, filters)
-    '''
-
+    """
     def __init__(self,
                  filters,
                  kernel_size,
@@ -143,7 +159,7 @@ class TCCNN_V2(Layer):
                  dropout_rate=0.3,
                  **kwargs):
 
-        super(TCCNN_V2, self).__init__(**kwargs)
+        super(TccnnV2, self).__init__(**kwargs)
 
         # 滤波器的数量
         self.filters = filters
@@ -255,3 +271,51 @@ class TCCNN_V2(Layer):
         padded_inputs = tf.concat([front_padding, averaged_inputs, back_padding],
                                   axis=1)  # 转换为 [batch_size, channels+kernel_size[0]-1, time_steps, features]
         return padded_inputs
+
+    def get_config(self):
+
+        config = super().get_config()
+
+        config.update({
+            "filters": self.filters,
+            "kernel_size": self.kernel_size,
+            "activation": self.activation,
+            "strides": self.strides,
+            "use_batch_norm": self.use_batch_norm,
+            "dropout_rate": self.dropout_rate,
+        })
+
+        return config
+
+@tf.keras.utils.register_keras_serializable(package="Custom", name="ChannelSelector")
+class ChannelSelector(Layer):
+    def __init__(self, start_index, step_size, **kwargs):
+        super(ChannelSelector, self).__init__(**kwargs)
+        self.start_index = start_index
+        self.step_size = step_size
+
+    def call(self, inputs):
+
+        selected_indices = tf.range(self.start_index, tf.shape(inputs)[-2], self.step_size)
+        return tf.gather(inputs, selected_indices, axis=-2)
+
+    def get_config(self):
+        config = super(ChannelSelector, self).get_config()
+        config.update({
+            "start_index": self.start_index,
+            "step_size": self.step_size
+        })
+        return config
+
+def channels_trans():
+    new_column_order = [2, 4, 6, 8, 10, 1, 3, 5, 7, 9, 11, 13, 12, 14, 16, 17, 19, 21, 23, 25, 27, 29, 31, 33, 34,
+                        36, 38, 40, 42, 44, 46, 48, 49, 51, 53, 55, 57, 59, 61, 63, 41, 43, 45, 47, 50, 52, 54, 56,
+                        58, 60, 62, 64, 22, 20, 18, 15, 30, 28, 26, 24, 39, 37, 35, 32]
+    # 使用列表推导式将每个元素减一
+    new_column_order_minus_one = [x - 1 for x in new_column_order]
+    for gesture_number in cf.gesture:
+        path = cf.data_path + f'original_data/sEMG_data{gesture_number}.csv'
+        df = pd.read_csv(path, header=None)
+        df = df.reindex(columns=new_column_order_minus_one)
+        df.to_csv(cf.data_path+f'original_data/trans_sEMG_data{gesture_number}.csv', index=False, header=False)
+        print(f"{gesture_number}号数据已处理好")

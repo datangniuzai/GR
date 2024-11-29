@@ -30,5 +30,5 @@ def generate_init_file(package_dir):
         f.write('\n')
 if __name__ == '__main__':
     # 替换 package_dir 为你的包路径
-    package_dir = "data_reading"
+    package_dir = "train_process"
     generate_init_file(package_dir)

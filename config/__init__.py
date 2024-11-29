@@ -16,9 +16,11 @@ sample_rate         = 2000        # 采样率
 collector_number    = None        # 采集器编号
 
 feature_shape       = None        # 输入特征形状
-save_path           = None        # 模型等信息保存地址
+training_info_path  = None        # 模型等信息保存地址
 
-folder_path         = None        # 文件夹地址
+data_path           = None        # 文件夹地址
+
+tvt_select_mode     = None        # 数据集选择方式
 
 train_num           = None        # 训练集数量
 test_num            = None        # 测试集数量
@@ -51,26 +53,29 @@ end_time            = None        # 模型训练结束整理的时间
 
 model               = None        # 模型
 model_name          = None        # 模型名称
+history             = None        # 训练历史
 
 
 def get_data_set_model():
+    global tvt_select_mode
     while True:
-        data_set_model = input("请选择数据集划分模式：1.随机；2.指定（请输入选项）:")
+        data_set_model = input("请选择数据集划分模式：1.随机；2.指定（请输入选项）：")
         if data_set_model in ['1', '2']:
+            tvt_select_mode = "随机" if data_set_model == '1' else "指定"
             return data_set_model
         else:
             print("⚠️ 输入无效！请输入'1'或'2'以选择数据集划分模式。\n")
 
 def pattern_set():
     while True:
-        data_set_model = input("请选择使用模式：1.数据读取；2.数据处理（请输入选项）:")
-        if data_set_model in ['1', '2']:
-            return data_set_model
+        pattern_mode = input("请选择使用模式：1.数据读取；2.数据处理（请输入选项）:")
+        if pattern_mode in ['1', '2']:
+            return pattern_mode
         else:
             print("⚠️ 输入无效！请输入'1'或'2'以选择使用模式。\n")
 
 def config_read():
-    global gesture_num, gesture, turn_read_sum, time_preread , folder_path ,collector_number
+    global gesture_num, gesture, turn_read_sum, time_preread , data_path ,collector_number
 
     global action_rest, gesture_rest
 
@@ -113,7 +118,7 @@ def config_read():
         # data process parameters
         dpp = config['data_process_parameters']
 
-        folder_path = dpp['folder_path'] + "/"
+        data_path = dpp['data_path'] + "/"
 
         window_size = dpp['window_size']
         step_size = dpp['step_size']
@@ -131,7 +136,7 @@ def config_read():
         model_name = mtp['model_name']
 
         # read vol info
-        info_file_path = str(folder_path) + "vol_exp_info.json"
+        info_file_path = str(data_path) + "vol_exp_info.json"
         with open(info_file_path, 'r', encoding='utf-8') as f:
             info = json.load(f)
 
@@ -204,7 +209,7 @@ def config_read():
 
 def data_folder_create():
 
-    global folder_path
+    global data_path
 
     current_time = datetime.datetime.now()
     folder_name = current_time.strftime("%Y-%m-%d_%H-%M-%S")
@@ -218,7 +223,7 @@ def data_folder_create():
 
     print(f"创建了数据集的文件夹，所在位置为： {folder_path}")
     folder_basename = os.path.basename(folder_path)
-    folder_path = folder_basename + "/"
+    data_path = folder_basename + "/"
 
 if __name__ == '__main__':
     config_read()

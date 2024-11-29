@@ -10,7 +10,7 @@
     "gesture_rest_duration":180
   },
   "data_process_parameters": {
-    "folder_path": "240921-L-Man-S-20",
+    "data_path": "240921-L-Man-S-20",
     "window_size": 400,
     "step_size": 400,
     "window_size_little": 200,

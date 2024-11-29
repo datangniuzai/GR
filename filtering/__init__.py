@@ -5,6 +5,5 @@
 # @File : __init__.py.py
 # @Software: PyCharm
 
-
-# filtering/__init__.py
 from .script import bandpass_and_notch_filter
+from .script import filter_and_save_data

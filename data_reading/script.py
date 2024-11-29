@@ -46,7 +46,7 @@ def sEMG_data_read_save():
                     reshaped_data = np.reshape(np.array(struct.unpack('<640h', data[18:1298])), (10, 64))
                     output_data = np.concatenate((output_data, reshaped_data), axis=0)
                     if output_data.shape[0] == (cf.time_preread + 1) * cf.sample_rate:
-                        with open(cf.folder_path + f'original_data/sEMG_data{gesture_number}.csv', 'a') as f:
+                        with open(cf.data_path + f'original_data/sEMG_data{gesture_number}.csv', 'a') as f:
                             np.savetxt(f, output_data[cf.sample_rate:, :] * 0.195, delimiter=',', fmt='%.6f')
                         turn = False
                         output_data = np.empty((0, 64), dtype=np.float32)
@@ -67,7 +67,7 @@ def sEMG_data_read_save():
 
         udp_socket.close()
 
-        print(f"❤️Please rename the folder [{cf.folder_path}] to identifier "
+        print(f"❤️Please rename the folder [{cf.data_path}] to identifier "
               "and complete the details of the [vol_exp_info.json].")
 
 def _parse_function(proto):
@@ -131,7 +131,7 @@ def generate_volunteer_experiment_info(start_time,end_time):
             }
         }
     }
-    file_name = os.path.join(cf.folder_path, "vol_exp_info.json")
+    file_name = os.path.join(cf.data_path, "vol_exp_info.json")
     with open(file_name, 'w', encoding='utf-8') as f:
         json.dump(experiment_info, f, ensure_ascii=False, indent=4)
 

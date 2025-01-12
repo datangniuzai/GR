@@ -2,8 +2,9 @@
 # -*- coding: utf-8 -*-
 # @Time : 2024/11/14 20:45
 # @Author : 李 嘉 轩
+# @team member : 赵雨新
 # @File : script.py
-# @Software: PyCharm
+# @Software: PyCharm Vscode
 
 import csv
 import os
@@ -13,9 +14,7 @@ import numpy as np
 import seaborn as sns
 import tensorflow as tf
 import matplotlib.pyplot as plt
-from tensorflow.keras.callbacks import ModelCheckpoint
 from sklearn.metrics import accuracy_score, confusion_matrix,recall_score
-
 import config as cf
 from data_reading import load_tfrecord_list
 
@@ -45,44 +44,26 @@ def model_train():
 
     print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))
 
-    sgd_optimizer = tf.keras.optimizers.SGD(learning_rate=0.01, momentum=0.9)
-
-    class ChangeOptimizerCallback(tf.keras.callbacks.Callback):
-        def __init__(self, callback_optimizer, switch_epoch, learning_rate):
-            super(ChangeOptimizerCallback, self).__init__()
-            self.callback_optimizer = callback_optimizer
-            self.switch_epoch = switch_epoch
-            self.learning_rate = learning_rate
-        def on_epoch_begin(self, epoch, logs=None):
-            if epoch == self.switch_epoch:
-                self.model.optimizer = self.callback_optimizer
-                tf.keras.backend.set_value(self.model.optimizer.learning_rate, self.learning_rate)
-                print(f"Optimizer changed to {self.callback_optimizer} at epoch {epoch}")
-
-    change_optimizer_callback = ChangeOptimizerCallback(sgd_optimizer, switch_epoch=cf.epochs-5,learning_rate=0.001)
-
-    model_checkpoint = ModelCheckpoint(
+    model_checkpoint = tf.keras.callbacks.ModelCheckpoint(
         cf.training_info_path + f'save_model/model_' + '{epoch:02d}.keras',
         save_weights_only=False, save_best_only=False, verbose=1)
 
 
-    x_val, y_val, x_p , x_t = load_tfrecord_list(cf.data_path + "processed_data/data_contact_val.tfrecord")
-    x_train, y_train, v_p , v_t = load_tfrecord_list(cf.data_path + "processed_data/data_contact_train.tfrecord")
-
-    train_dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(len(x_train)).batch(64)
-    val_dataset = tf.data.Dataset.from_tensor_slices((x_val, y_val)).batch(16)
-
+    x_val, adjacency_val,y_val, x_p , x_t = load_tfrecord_list(cf.data_path + "processed_data/data_contact_val.tfrecord")
+    x_train, adjacency_train,y_train, v_p , v_t = load_tfrecord_list(cf.data_path + "processed_data/data_contact_train.tfrecord")
+    train_dataset = tf.data.Dataset.from_tensor_slices(((adjacency_train,x_train),y_train)).shuffle(len(x_train)).batch(32)
+    val_dataset = tf.data.Dataset.from_tensor_slices(((adjacency_val,x_val),y_val)).batch(16)
     cf.history = cf.model.fit(train_dataset, validation_data=val_dataset, epochs=cf.epochs,
-                        callbacks=[model_checkpoint, change_optimizer_callback])
+                        callbacks=[model_checkpoint])
 
 
-def Plot_matrix(data_path,model_path):
-
-    x_test, y_test,x_p,x_t = load_tfrecord_list(data_path)
+def Plot_matrix():
+    cf.training_info_path = "2024.12.21/2024-12-25_14-21-06/"
+    model_path = cf.training_info_path+"save_model/model_17.keras"
+    x_test,adjacency_test, y_test,x_p,x_t = load_tfrecord_list(cf.data_path + "processed_data/data_contact_test.tfrecord")
     x_test_tensor = tf.convert_to_tensor(x_test, dtype=tf.float32)
-
+    adjacency_test_tensor = tf.convert_to_tensor(adjacency_test,dtype=tf.float32)
     cf.model.load_weights(model_path)
-
     y_pred_prob = cf.model.predict(x_test_tensor)
     y_pred = np.argmax(y_pred_prob, axis=1)
 

@@ -5,18 +5,18 @@
     "collector_number": 1,
     "gesture_read_count_per_instance": 20,
     "read_duration_per_instance": 60,
-    "gesture_sequence":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],
+    "gesture_sequence":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19],
     "action_rest_duration": 20,
     "gesture_rest_duration":180
   },
   "data_process_parameters": {
     "data_path": "240921-L-Man-S-20",
-    "window_size": 400,
-    "step_size": 400,
-    "window_size_little": 200,
+    "window_size": 300,
+    "step_size": 220,
+    "window_size_little": 100,
     "step_size_little": 100,
     "scaling": 200,
-    "feature_shape": [3,64,5],
+    "feature_shape": [3,64,6],
     "specify_data_set_mode": {
       "train_nums": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
       "val_nums": [13, 14, 15, 16],
@@ -30,6 +30,6 @@
   },
   "model_train_parameters": {
     "epochs": 20,
-    "model_name": "TCCNN"
+    "model_name": "reGAU"
   }
 }

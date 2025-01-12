@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# @Time : 2024/11/14 19:43
+# @Time : 2024/11/14 19:48
 # @Author : 李 嘉 轩
+# @team member : 赵雨新
 # @File : script.py
-# @Software: PyCharm
+# @Software: PyCharm Vscode
+
 
 import os
 import json
@@ -78,6 +80,7 @@ def _parse_function(proto):
     """
     keys_to_features = {
         'window': tf.io.FixedLenFeature(cf.feature_shape, tf.float32),
+        'adjacency': tf.io.FixedLenFeature([64,64], tf.float32),
         'label': tf.io.FixedLenFeature([1], tf.int64),
         'time_preread_index': tf.io.FixedLenFeature([1], tf.int64),
         'window_index': tf.io.FixedLenFeature([1], tf.int64)
@@ -89,7 +92,7 @@ def _parse_function(proto):
     data['time_preread_index'] = tf.cast(data['time_preread_index'], tf.uint8)
     data['window_index'] = tf.cast(data['window_index'], tf.uint8)
 
-    return data["window"], data['label'], data['time_preread_index'], data['window_index']
+    return data["window"], data['adjacency'],data['label'], data['time_preread_index'], data['window_index']
 
 def generate_volunteer_experiment_info(start_time,end_time):
 
@@ -163,15 +166,17 @@ def load_tfrecord_list(tfrecord_path):
     dataset = dataset.map(_parse_function)
 
     window_datas = []
+    adjacencys = []
     labels = []
     time_preread_indices = []
     window_indices = []
 
-    for window_data, label, time_preread_index, window_index in dataset:
+    for window_data,adjacency,label, time_preread_index, window_index in dataset:
         window_datas.append(window_data.numpy())
+        adjacencys.append(adjacency.numpy())
         labels.append(label.numpy())
         time_preread_indices.append(time_preread_index.numpy())
         window_indices.append(window_index.numpy())
 
-    return window_datas, labels, time_preread_indices, window_indices
+    return window_datas,adjacencys,labels, time_preread_indices, window_indices
 

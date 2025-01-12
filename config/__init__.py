@@ -2,8 +2,9 @@
 # -*- coding: utf-8 -*-
 # @Time : 2024/11/14 19:28
 # @Author : 李 嘉 轩
+# @team member : 赵雨新
 # @File : __init__.py.py
-# @Software: PyCharm
+# @Software: PyCharm Vscode
 
 import os
 import datetime

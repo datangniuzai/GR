@@ -4,11 +4,11 @@
   "detailed description": "",
   "note": "The following description of time is in hours.",
   "explanation about identifier": "date/subject's_last_name/man_or_female/static_or_dynamic/number_of_gestures",
-  "identifier": "240912-W-Man-S-17",
+  "identifier": "240912-W-Man-S-20",
   "volunteer_info":
   {
-    "name": "Wang Zhengguang/王证光",
-    "age": 22,
+    "name": "Zhao Yuxin/赵雨新",
+    "age": 20,
     "gender": "male",
     "measured_arm": "left",
     "diet": "Normal",
@@ -28,13 +28,13 @@
   },
     "experiment_info":
     {
-      "gesture_sequence":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],
+      "gesture_sequence":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14],
       "gesture_read_count_per_instance": 20,
       "read_duration_per_instance": 4,
       "experiment_time":
       {
-        "start_time": "2024-11-18T08:00:00",
-        "end_time": "2024-11-18T10:00:00",
+        "start_time": "2024-11-18T016:00:00",
+        "end_time": "2024-11-18T18:00:00",
         "gesture_rest": 180,
         "action_rest":15
       }

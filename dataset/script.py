@@ -2,123 +2,43 @@
 # -*- coding: utf-8 -*-
 # @Time : 2024/11/14 19:48
 # @Author : 李 嘉 轩
+# @team member : 赵雨新
 # @File : script.py
-# @Software: PyCharm
+# @Software: PyCharm Vscode
 
 import os
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-
+from dataset.build_adjacency import build_martix,adj_to_bias,fill_new_adjacency_matrix,sample_neighbors
 import config as cf
 from filtering import bandpass_and_notch_filter
 from data_reading import load_tfrecord
-
-def time_features(data):
-    """
-    只提取时域特征，加小窗，特征顺序：MAV，RMS，MSE，过零点数，WAMP
-    """
+from dataset.caculate_features import  zero_crossing_rate,mean_absolute_value,calculate_mean_frequency,calculate_median_frequency,WL,root_mean_square
+from dataset.normalize import z_score_normalize
+def generate_smallwindowed_data(data, window_size,stride):
     num_channels, signal_length = data.shape
-    num_windows = (signal_length - cf.window_size_little) // cf.step_size_little + 1
-    features = []
-
+    num_windows = (signal_length - window_size) //stride + 1
+    windowed_data = np.zeros((num_windows,num_channels,window_size))
     for i in range(num_windows):
-
-        start = i * cf.step_size_little
-
-        end = start + cf.window_size_little
-        windowed_data = data[:, start:end]
-
-        max_possible_rms = np.max(windowed_data) / 2
-        max_possible_mse = (np.max(windowed_data) / 2) ** 2
-        max_possible_zero_crossings = cf.step_size_little - 1
-        max_possible_willison_amplitudes = cf.step_size_little - 1
-
-        mav = np.mean(np.abs(windowed_data), axis=1)
-        rms = np.sqrt(np.mean(windowed_data ** 2, axis=1)) / max_possible_rms
-        mse = np.mean((windowed_data - np.sqrt(np.mean(windowed_data ** 2, axis=0))) ** 2, axis=1) / max_possible_mse
-
-        # 过零点数
-        zero_crossings = []
-        for channel in windowed_data:
-            crossings = (np.sum(np.diff(np.sign(channel)) != 0)) / cf.step_size_little
-            zero_crossings.append(crossings / max_possible_zero_crossings)
-
-        # Willison幅值
-        threshold = 20 / cf.scaling
-        willison_amplitudes = []
-        for channel in windowed_data:
-            differences = np.diff(channel)
-            willison_amplitude = np.sum(np.abs(differences) > threshold)
-            willison_amplitudes.append(willison_amplitude / max_possible_willison_amplitudes)
-        feature = np.array([mav, rms, mse, np.array(zero_crossings), np.array(willison_amplitudes)])
-        features.append(feature.T)
-    features = np.array(features)
+        start = i * stride
+        end = start + window_size
+        windowed_data[i,:,:] = data[:, start:end]
+    return windowed_data
+def time_features(data):
+    data = generate_smallwindowed_data(data,cf.window_size_little,cf.step_size_little)
+    timesteps = data.shape[0]
+    channels = data.shape[1]
+    feature_functions = [
+        zero_crossing_rate,mean_absolute_value,calculate_mean_frequency,calculate_median_frequency,WL,
+        root_mean_square]
+    features = np.zeros((timesteps,channels,len(feature_functions)))
+    data = [feature_func(data) for feature_func in feature_functions]
+    for i in range(len(feature_functions)):
+        features[:,:,i]=data[i]
+    features = z_score_normalize(features)
     return features
 
-def time_frequency_features(data):
-    """
-    提取时频域特征，特征顺序：MAV，RMS，MSE，过零点数，Willison幅值，中值频率（Median Frequency），均值频率（Mean Frequency），频率比（Frequency Ratio）
-    """
-    len_data = data.shape[1]
-    max_possible_rms = np.max(data) / 2
-    max_possible_mse = (np.max(data) / 2) ** 2
-    max_possible_zero_crossings = len_data - 1
-    max_possible_willison_amplitudes = len_data - 1
-    nyquist_frequency = cf.sample_rate / 2
-
-    mav = np.mean(np.abs(data), axis=1)
-    rms = np.sqrt(np.mean(data ** 2, axis=1)) / max_possible_rms
-    mse = np.mean((data - np.sqrt(np.mean(data ** 2, axis=0))) ** 2, axis=1) / max_possible_mse
-
-    # 过零点数
-    zero_crossings = []
-    for channel in data:
-        crossings = (np.sum(np.diff(np.sign(channel)) != 0)) / len_data
-        zero_crossings.append(crossings / max_possible_zero_crossings)
-
-    # Willison幅值
-    threshold = 20 / cf.scaling
-    willison_amplitudes = []
-    for channel in data:
-        differences = np.diff(channel)
-        willison_amplitude = np.sum(np.abs(differences) > threshold)
-        willison_amplitudes.append(willison_amplitude / max_possible_willison_amplitudes)
-    # 应用汉宁窗
-    window = np.hanning(cf.window_size_little)
-    windowed_data_han = data * window
-    # 频率特征
-    fft_results = np.zeros((windowed_data_han.shape[0], len_data // 2), dtype=complex)
-    for i in range(windowed_data_han.shape[0]):
-        fft_result = np.fft.fft(windowed_data_han[i])
-        fft_results[i] = fft_result[:len_data // 2]  # 只取正频率部分
-
-    frequencies = np.fft.fftfreq(len_data, 1 / cf.sample_rate)[:windowed_data_han.shape[1] // 2]
-    mdf_values = []
-    mnf_values = []
-    fr_values = []
-    for i in range(windowed_data_han.shape[0]):
-        magnitude_spectrum = np.abs(fft_results[i])
-        non_zero_indices = magnitude_spectrum > 0
-        cumulative_magnitude = np.cumsum(magnitude_spectrum[non_zero_indices])
-        half_total_magnitude = cumulative_magnitude[-1] / 2
-        mdf_index = np.argmax(cumulative_magnitude >= half_total_magnitude)
-        mdf = frequencies[non_zero_indices][mdf_index] / nyquist_frequency
-        mdf_values.append(mdf)
-
-        mnf = np.average(frequencies, weights=magnitude_spectrum) / nyquist_frequency
-        mnf_values.append(mnf)
-
-        low_freq_threshold = 80
-        high_freq_threshold = 160
-        low_freq_energy = np.sum(magnitude_spectrum[frequencies <= low_freq_threshold])
-        high_freq_energy = np.sum(magnitude_spectrum[frequencies >= high_freq_threshold])
-        fr = high_freq_energy / low_freq_energy if low_freq_energy != 0 else float('inf')
-        fr_values.append(fr)
-    feature = (
-        np.array([mav, rms, mse, np.array(zero_crossings), np.array(willison_amplitudes), np.array(mdf_values),
-                  np.array(mnf_values), np.array(fr_values)]))
-    return feature
 
 def online_dataset():
     print("正在处理数据，请稍等")
@@ -130,7 +50,7 @@ def online_dataset():
 
     for gesture_number in cf.gesture:
         path = cf.data_path + f'original_data/sEMG_data{gesture_number}.csv'
-        df = pd.read_csv(path, header=None).to_numpy().T / cf.scaling
+        df = pd.read_csv(path, header=None).to_numpy().T 
 
         for dataset_type in ['train', 'test', 'val']:
             dataset_establish(df, gesture_number, dataset_type)
@@ -148,32 +68,35 @@ def dataset_establish(df: np.ndarray, gesture_number:int, dataset_type :str):
     window_data_label = []
     window_data_time_preread_index = []
     window_data_window_index = []
-
-    for i in range(cf.turn_read_sum):
+    adjacency = []
+    for i in range(1,cf.turn_read_sum+1):
         if i in getattr(cf, f"{dataset_type}_nums"):
-            data = df[:, i * (cf.time_preread * cf.sample_rate):
-                         (i + 1) * (cf.time_preread * cf.sample_rate)]
+            data = df[:, (i - 1) * (cf.time_preread * cf.sample_rate):i * (cf.time_preread * cf.sample_rate)]
             for j in range(0, data.shape[1] - cf.window_size + 1, cf.step_size):
                 window_data = data[:, j:j + cf.window_size]
                 window_data = bandpass_and_notch_filter(window_data)
                 window_data_feature.append(time_features(window_data))
+                adjacency.append(build_martix())
                 window_data_label.append(gesture_number)
                 window_data_time_preread_index.append(i)
                 window_data_window_index.append(j)
 
     window_data_feature_tensor = tf.convert_to_tensor(window_data_feature, dtype=tf.float32)
+    adjacency = adj_to_bias(fill_new_adjacency_matrix(sample_neighbors(np.array(adjacency),5),len(adjacency),64))
+    adjacency_tensor = tf.convert_to_tensor(adjacency,dtype=tf.float32)
     label_tensor = tf.convert_to_tensor(window_data_label, dtype=tf.uint8)
     time_preread_index_tensor = tf.convert_to_tensor(window_data_time_preread_index, dtype=tf.uint8)
     window_index_tensor = tf.convert_to_tensor(window_data_window_index, dtype=tf.uint8)
-    dataset = tf.data.Dataset.from_tensor_slices((window_data_feature_tensor, label_tensor,
+    dataset = tf.data.Dataset.from_tensor_slices((window_data_feature_tensor, adjacency_tensor,label_tensor,
                                                   time_preread_index_tensor, window_index_tensor))
     save_path = os.path.join(cf.data_path,"processed_data")
     os.makedirs(save_path, exist_ok=True)
     tfrecord_path = os.path.join(save_path, f"data_{gesture_number}_{dataset_type}.tfrecord")
     with tf.io.TFRecordWriter(tfrecord_path) as writer:
-        for window, label, time_preread_index, window_index in dataset:
+        for window,adjacencys, label, time_preread_index, window_index in dataset:
             feature = {
                 'window': tf.train.Feature(float_list=tf.train.FloatList(value=window.numpy().flatten())),
+                'adjacency': tf.train.Feature(float_list=tf.train.FloatList(value=adjacencys.numpy().flatten())),
                 'label': tf.train.Feature(int64_list=tf.train.Int64List(value=[label.numpy()])),
                 'time_preread_index': tf.train.Feature(
                     int64_list=tf.train.Int64List(value=[time_preread_index.numpy()])),
@@ -213,10 +136,12 @@ def save_tfrecord(dataset :tf.data.Dataset,tfrecord_save_path:str):
     将数据集中的每个项（窗口数据、标签等）转换为 `tf.train.Example` 格式并写入指定的 TFRecord 文件。
     """
     with tf.io.TFRecordWriter(tfrecord_save_path) as writer:
-        for window, label, time_preread_index, window_index in dataset:
+        for window, adjacencys,label, time_preread_index, window_index in dataset:
             feature = {
                 'window': tf.train.Feature(
                     float_list=tf.train.FloatList(value=window.numpy().flatten())),
+                'adjacency': tf.train.Feature(
+                    float_list=tf.train.FloatList(value=adjacencys.numpy().flatten())),
                 'label': tf.train.Feature(
                     int64_list=tf.train.Int64List(value=[label.numpy().item()])),
                 'time_preread_index': tf.train.Feature(

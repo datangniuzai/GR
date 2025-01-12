@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # @Time : 2024/11/19 21:14
-# @Author : 李 嘉 轩
+# @Author : JIAXUAN LI
 # @File : my_layers.py
 # @Software: PyCharm
 

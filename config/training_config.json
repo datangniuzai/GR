@@ -2,12 +2,13 @@
   "name": "train_config",
   "description":"This JSON is used to adjust various parameters of training.When reading data, please turn the pattern to True",
   "data_reading_parameters": {
-    "collector_number": 1,
+    "gloves": "left",
     "gesture_read_count_per_instance": 20,
-    "read_duration_per_instance": 60,
-    "gesture_sequence":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],
-    "action_rest_duration": 20,
-    "gesture_rest_duration":180
+    "read_duration_per_instance": 4,
+    "gesture_sequence":[1,2,3,4,5,6,7,8,9,10],
+    "action_rest_duration": 10,
+    "gesture_rest_duration":60,
+    "collector_number": 2
   },
   "data_process_parameters": {
     "data_path": "240921-L-Man-S-20",
@@ -17,11 +18,13 @@
     "step_size_little": 100,
     "scaling": 200,
     "feature_shape": [3,64,5],
+
     "specify_data_set_mode": {
       "train_nums": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
       "val_nums": [13, 14, 15, 16],
       "test_nums": [17, 18, 19, 20]
     },
+
     "random_data_set_mode": {
       "train_num": 12,
       "val_num": 4,

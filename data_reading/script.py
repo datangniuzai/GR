@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # @Time : 2024/11/14 19:43
-# @Author : 李 嘉 轩
+# @Author : JIAXUAN LI
 # @File : script.py
 # @Software: PyCharm
 
@@ -28,36 +28,51 @@ def sEMG_data_read_save():
 
     udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     udp_socket.bind(('192.168.1.100', cf.collector_number))
+
     start_time = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+
     try:
+
         output_data = np.empty((0, 64), dtype=np.float32)
+
         i = 1
         while i < (cf.turn_read_sum+1):
+
             for gesture_number in cf.gesture:
+
                 text_to_speak = str(f"请做好{gesture_number}号手势,采集开始")
                 print(text_to_speak)
                 engine.say(text_to_speak)
                 engine.runAndWait()
                 time.sleep(0.5)
                 print("开始采集")
+
                 turn = True
+
                 while turn:
                     data, addr = udp_socket.recvfrom(1300)
                     reshaped_data = np.reshape(np.array(struct.unpack('<640h', data[18:1298])), (10, 64))
                     output_data = np.concatenate((output_data, reshaped_data), axis=0)
+
                     if output_data.shape[0] == (cf.time_preread + 1) * cf.sample_rate:
+
                         with open(cf.data_path + f'original_data/sEMG_data{gesture_number}.csv', 'a') as f:
                             np.savetxt(f, output_data[cf.sample_rate:, :] * 0.195, delimiter=',', fmt='%.6f')
+
                         turn = False
+
                         output_data = np.empty((0, 64), dtype=np.float32)
+
                 time.sleep(0.5)
                 text_to_speak = str(f"请休息")
                 print(text_to_speak)
                 engine.say(text_to_speak)
                 engine.runAndWait()
-                time.sleep(15)
+                time.sleep(cf.action_rest)
+
             i += 1
-            time.sleep(180)
+
+            time.sleep(cf.gesture_rest)
 
     finally:
 

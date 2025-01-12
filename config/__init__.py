@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Time : 2024/11/14 19:28
 # @Author : 李 嘉 轩
-# @File : __init__.py.py
+# @File : __init__.py
 # @Software: PyCharm
 
 import os
@@ -13,6 +13,7 @@ import random
 # configs
 num_channels        = 64          # 通道数
 sample_rate         = 2000        # 采样率
+gloves              = None        # 手套
 collector_number    = None        # 采集器编号
 
 feature_shape       = None        # 输入特征形状

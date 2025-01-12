@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # @Time : 2024/11/14 19:36
-# @Author : 李 嘉 轩
+# @Author : JIAXUAN LI
 # @File : script.py
 # @Software: PyCharm
 

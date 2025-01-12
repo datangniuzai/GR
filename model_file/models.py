@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # @Time : 2024/11/20 13:14
-# @Author : 李 嘉 轩
+# @Author : JIAXUAN LI
 # @File : models.py
 # @Software: PyCharm
 

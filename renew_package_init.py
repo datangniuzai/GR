@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # @Time : 2024/11/17 05:18
-# @Author : 李 嘉 轩
+# @Author : JIAXUAN LI
 # @File : renew_package_init.py
 # @Software: PyCharm
 
@@ -20,9 +20,9 @@ def generate_init_file(package_dir):
             with open(file_path, 'r', encoding='utf-8') as f:
                 node = ast.parse(f.read())
                 for n in node.body:
-                    if isinstance(n, ast.FunctionDef):  # 检查是否是函数
+                    if isinstance(n, ast.FunctionDef):
                         content_lines.append(f'from .{module_name} import {n.name}')
-                    elif isinstance(n, ast.ClassDef):  # 检查是否是类
+                    elif isinstance(n, ast.ClassDef):
                         content_lines.append(f'from .{module_name} import {n.name}')
 
     with open(init_file, 'w', encoding='utf-8') as f:

@@ -138,21 +138,15 @@ def dataset_establish(df: np.ndarray, gesture_number:int, dataset_type :str):
     window_data_feature_tensor = tf.convert_to_tensor(window_data_feature, dtype=tf.float32)
     adjacency_tensor = tf.convert_to_tensor(adjacency,dtype=tf.float32)
     label_tensor = tf.convert_to_tensor(window_data_label, dtype=tf.uint8)
+
     dataset = tf.data.Dataset.from_tensor_slices((window_data_feature_tensor,adjacency_tensor,label_tensor))
+
     save_path = os.path.join(cf.data_path,"processed_data")
     os.makedirs(save_path, exist_ok=True)
+
     tfrecord_path = os.path.join(save_path, f"data_{gesture_number}_{dataset_type}.tfrecord")
 
-    with tf.io.TFRecordWriter(tfrecord_path) as writer:
-        for window, adjacency,label in dataset:
-            feature = {
-                'window': tf.train.Feature(float_list=tf.train.FloatList(value=window.numpy().flatten())),
-                'adjacency': tf.train.Feature(float_list=tf.train.FloatList(value=adjacency.numpy().flatten())),
-                'label': tf.train.Feature(int64_list=tf.train.Int64List(value=[label.numpy()])),
-            }
-            example = tf.train.Example(features=tf.train.Features(feature=feature))
-            writer.write(example.SerializeToString())
-
+    save_tfrecord(dataset,tfrecord_path)
 
 def dataset_connect():
 
@@ -169,34 +163,32 @@ def dataset_connect():
             else:
                 merged_dataset = merged_dataset.concatenate(dataset)
 
-        tfrecord_save_path = os.path.join(cf.data_path,f"processed_data/data_contact_{dataset_type}.tfrecord")
-        save_tfrecord(merged_dataset,tfrecord_save_path)
-        print(f"[{dataset_type}]数据已合并并保存在[{tfrecord_save_path}]")
+        connect_tfrecord_save_path = os.path.join(cf.data_path,f"processed_data/data_contact_{dataset_type}.tfrecord")
+
+        save_tfrecord(merged_dataset,connect_tfrecord_save_path)
+
+        print(f"[{dataset_type}]数据已合并并保存在[{connect_tfrecord_save_path}]")
 
 def save_tfrecord(dataset :tf.data.Dataset,tfrecord_save_path:str):
     """
     将数据集保存为 TFRecord 文件。
 
     参数：
-    dataset (iterable)：包含窗口数据、标签、时间索引和窗口索引的迭代器。
+    dataset (iterable)：包含窗口数据、标签、生成的邻接矩阵。
     tfrecord_save_path (str)：保存 TFRecord 文件的路径。
 
     功能：
     将数据集中的每个项（窗口数据、标签等）转换为 `tf.train.Example` 格式并写入指定的 TFRecord 文件。
     """
     with tf.io.TFRecordWriter(tfrecord_save_path) as writer:
-        for window, adjacency,label, time_preread_index, window_index in dataset:
+        for window, adjacency, label in dataset:
             feature = {
-                'window': tf.train.Feature(
-                    float_list=tf.train.FloatList(value=window.numpy().flatten())),
-                'adjacency': tf.train.Feature(
-                    float_list=tf.train.FloatList(value=adjacency.numpy().flatten())),
-                'label': tf.train.Feature(
-                    int64_list=tf.train.Int64List(value=[label.numpy().item()])),
+                'window': tf.train.Feature(float_list=tf.train.FloatList(value=window.numpy().flatten())),
+                'adjacency': tf.train.Feature(float_list=tf.train.FloatList(value=adjacency.numpy().flatten())),
+                'label': tf.train.Feature(int64_list=tf.train.Int64List(value=[label.numpy()])),
             }
             example = tf.train.Example(features=tf.train.Features(feature=feature))
             writer.write(example.SerializeToString())
-
 
 
 

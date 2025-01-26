@@ -1,0 +1,44 @@
+{
+  "name": "volunteer_experiment_info",
+  "description": "Details of subjects and experimental process",
+  "detailed description": "",
+  "note": "The following description of time is in hours.",
+  "explanation about identifier": "date/subject's_last_name/man_or_female/static_or_dynamic/number_of_gestures",
+  "identifier": "250114-W-Man-S-26",
+  "volunteer_info":
+  {
+    "name": "Wang hongyu/王 泓雨",
+    "age": 20,
+    "gender": "male",
+    "measured_arm": "left",
+    "diet": "Normal",
+    "weekly_exercise_duration":"",
+    "subject_conditions":
+    {
+      "neurological_diseases": "",
+      "physical_conditions": "",
+      "sleep":
+      {
+        "previous_night_sleep_duration": 7.5,
+        "bedtime": "2024-11-17T23:00:00"
+      },
+      "diet": "Normal",
+      "weekly_exercise_duration": 3.5
+    }
+  },
+    "experiment_info":
+    {
+      "gesture_sequence":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26],
+      "gesture_read_count_per_instance": 20,
+      "read_duration_per_instance": 4,
+      "experiment_time":
+      {
+        "start_time": "2024-11-28T016:00:00",
+        "end_time": "2024-11-28T18:00:00",
+        "gesture_rest": 60,
+        "action_rest":12
+      }
+    }
+}
+
+

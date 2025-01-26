@@ -1,26 +1,26 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # @Time : 2024/11/14 20:45
-# @Author : 李 嘉 轩
+# @Author : Jiaxuan LI
 # @File : train_process.py
 # @Software: PyCharm
 
-import csv
 import os
+import csv
 import datetime
 import warnings
+
 import numpy as np
 import seaborn as sns
 import tensorflow as tf
 import matplotlib.pyplot as plt
-from sklearn.metrics import accuracy_score, confusion_matrix,recall_score
+from sklearn.metrics import accuracy_score, confusion_matrix, recall_score
+
 import config as cf
 from data_reading import load_tfrecord_list
 
- 
 def model_train():
 
-    # 生成训练文件夹
     current_time = datetime.datetime.now()
     folder_name = current_time.strftime("%Y-%m-%d_%H-%M-%S")
 
@@ -43,12 +43,9 @@ def model_train():
 
     print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))
 
-
-
     model_checkpoint = tf.keras.callbacks.ModelCheckpoint(
         cf.training_info_path + f'save_model/model_' + '{epoch:02d}.keras',
         save_weights_only=False, save_best_only=False, verbose=1)
-
 
     x_val, adjacency_val,y_val, x_p , x_t = load_tfrecord_list(cf.data_path + "processed_data/data_contact_val.tfrecord")
     x_train, adjacency_train,y_train, v_p , v_t = load_tfrecord_list(cf.data_path + "processed_data/data_contact_train.tfrecord")
@@ -82,7 +79,6 @@ def Plot_matrix():
     plt.show()
 
 def Plot_loos_acc_matrix_test():
-    cf.training_info_path = "250112-Z-Man-S-26/2024-12-16_15-26-21/"
     if not cf.training_info_path:
         warnings.warn("Warning: training_info_path is not set!")
 

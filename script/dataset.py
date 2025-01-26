@@ -16,9 +16,9 @@ import config as cf
 from data_reading import load_tfrecord
 from filtering import bandpass_and_notch_filter
 
-# ------------------------------------- #
-# Start--Reset Adjacency Functionality  #
-# ------------------------------------- #
+# ------------------------------ #
+# Reset Adjacency Functionality  #
+# ------------------------------ #
 def build_one_adjacency():
     one_adjacency = np.array([
         [0,1,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0],
@@ -144,15 +144,10 @@ def reset_adj(graph_count: int) -> Any:
     bias_adj = adj_to_bias(filled_adj, 1)
 
     return bias_adj
-# ------------------------------------- #
-#  Over--Reset Adjacency Functionality  #
-# ------------------------------------- #
 
-def calc_z_score_normalize(data):
-    mean_vals = np.mean(data, axis=-2, keepdims=True)
-    std_vals = np.std(data, axis=-2, keepdims=True)
-    normalized_data = (data - mean_vals) / (std_vals+0.000001)
-    return normalized_data
+# ------------------------------ #
+#   Feature Extraction Function  #
+# ------------------------------ #
 
 def calc_TD(data: np.ndarray) -> np.ndarray:
     """
@@ -186,6 +181,7 @@ def calc_TD(data: np.ndarray) -> np.ndarray:
         willison_amplitudes = np.sum(np.abs(np.diff(windowed_data, axis=1)) > willison_threshold, axis=1)
         # Stack the features together
         feature = np.array([mav, rms, mse, zero_crossings, willison_amplitudes])
+
         features.append(feature.T)
 
     features = np.array(features)
@@ -206,13 +202,35 @@ def z_score_normalize_per_window(features: np.ndarray) -> np.ndarray:
     normalized_features = (features - np.mean(features, axis=(1, 2), keepdims=True)) / np.std(features, axis=(1, 2), keepdims=True)
     return normalized_features
 
+def min_max_normalize_per_feature(features: np.ndarray) -> np.ndarray:
+    features_min = np.min(features, axis=(0, 1), keepdims=True)
+    features_max = np.max(features, axis=(0, 1), keepdims=True)
+    return (features - features_min) / (features_max - features_min)
+
+def min_max_normalize_per_channel(features: np.ndarray) -> np.ndarray:
+    features_min = np.min(features, axis=(0, 2), keepdims=True)
+    features_max = np.max(features, axis=(0, 2), keepdims=True)
+    return (features - features_min) / (features_max - features_min)
+
+def min_max_normalize_per_window(features: np.ndarray) -> np.ndarray:
+    features_min = np.min(features, axis=(1, 2), keepdims=True)
+    features_max = np.max(features, axis=(1, 2), keepdims=True)
+    return (features - features_min) / (features_max - features_min)
+
+# ------------------------------ #
+#   Tfrecord Build Function      #
+# ------------------------------ #
+
 def tfrecord_establish(df: np.ndarray, gesture_number: int, dataset_type: str):
     """
-    通用数据处理函数，用于训练集、测试集和验证集的特征提取和保存
-    :param df: 输入信号
-    :param gesture_number: 手势编号
-    :param dataset_type: 数据集类型（'train'/'test'/'val'）
-    :return: 数据集的element_spec
+    General data processing function for feature extraction and saving for training, testing, and validation datasets.
+
+    This function extracts features from input signals, processes them, and saves them as TensorFlow TFRecord files.
+
+    :param df: Input signal data (shape: [num_channels, signal_length])
+    :param gesture_number: Gesture identifier (integer)
+    :param dataset_type: Type of dataset ('train'/'test'/'val')
+    :return: The element_spec of the dataset
     """
     window_data_feature = []
     window_data_label = []
@@ -274,18 +292,18 @@ def tfrecord_connect():
 
         tfrecord_save(merged_dataset,connect_tfrecord_save_path)
 
-        print(f"[{dataset_type}]数据已合并并保存在[{connect_tfrecord_save_path}]")
+        print(f"[{dataset_type}] data has been merged and saved at [{connect_tfrecord_save_path}]")
 
 def tfrecord_save(dataset :tf.data.Dataset,tfrecord_save_path:str):
     """
-    将数据集保存为 TFRecord 文件。
+    Save the dataset as a TFRecord file.
 
-    参数：
-    dataset (iterable)：包含窗口数据、标签、生成的邻接矩阵。
-    tfrecord_save_path (str)：保存 TFRecord 文件的路径。
+    Parameters:
+    dataset (iterable): A dataset containing window data, labels, and generated adjacency matrices.
+    tfrecord_save_path (str): The path where the TFRecord file will be saved.
 
-    功能：
-    将数据集中的每个项（窗口数据、标签等）转换为 `tf.train.Example` 格式并写入指定的 TFRecord 文件。
+    Functionality:
+    Converts each item in the dataset (window data, labels, etc.) to `tf.train.Example` format and writes it to the specified TFRecord file.
     """
     with tf.io.TFRecordWriter(tfrecord_save_path) as writer:
         for window, adjacency, label,time_preread_index, window_index in dataset:
@@ -305,19 +323,25 @@ def tfrecord_save(dataset :tf.data.Dataset,tfrecord_save_path:str):
 # ------------------------------------- #
 
 def database_create():
-    print("正在处理数据，请稍等")
+    """
+    Process the data and create the corresponding TFRecord files for training, testing, and validation datasets.
+
+    Functionality:
+    This function reads sEMG data from CSV files for each gesture, processes it, and saves it as TFRecord files for each dataset type (train, test, val).
+    """
+    print("Processing the data, please wait...")
     print(
-        f"取第{cf.train_nums}次采集的数据作为训练集，\n"
-        f"取第{cf.test_nums}次采集的数据作为测试集，\n"
-        f"取第{cf.val_nums}次采集的数据作为验证集\n"
+        f"Using the {cf.train_nums}-th data collection as the training set,\n"
+        f"Using the {cf.test_nums}-th data collection as the test set,\n"
+        f"Using the {cf.val_nums}-th data collection as the validation set.\n"
     )
 
     for gesture_number in cf.gesture:
         path = cf.data_path + f'original_data/sEMG_data{gesture_number}.csv'
         df = pd.read_csv(path, header=None).to_numpy().T
-        for dataset_type in ['train','val','test']:
+        for dataset_type in ['train', 'val', 'test']:
             tfrecord_establish(df, gesture_number, dataset_type)
-        print(f"{gesture_number}号手势数据处理完毕")
+        print(f"Gesture {gesture_number} data processing completed.")
 
 # ------------------------------------- #
 #  Over--Database_create--main func     #

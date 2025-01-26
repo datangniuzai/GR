@@ -9,11 +9,10 @@ import os
 import time
 import numpy as np
 import pandas as pd
-from typing import Any
+from typing import Any, List, Tuple, Dict
 import tensorflow as tf
 
 import config as cf
-from data_reading import load_tfrecord
 from filtering import bandpass_and_notch_filter
 
 # ------------------------------ #
@@ -281,7 +280,7 @@ def tfrecord_connect():
 
         for gesture_number in cf.gesture:
 
-            dataset= load_tfrecord(cf.data_path + f"processed_data/data_{gesture_number}_{dataset_type}.tfrecord")
+            dataset= load_tfrecord_to_dataset(cf.data_path + f"processed_data/data_{gesture_number}_{dataset_type}.tfrecord")
 
             if merged_dataset is None:
                 merged_dataset = dataset
@@ -317,6 +316,86 @@ def tfrecord_save(dataset :tf.data.Dataset,tfrecord_save_path:str):
             }
             example = tf.train.Example(features=tf.train.Features(feature=feature))
             writer.write(example.SerializeToString())
+# ----------------------------- #
+#   Tfrecord Loading Function   #
+# ----------------------------- #
+
+def _parse_function(proto: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
+    """
+    Parse each Example from the TFRecord file and adjust the data types and shapes.
+
+    Parameters:
+    proto (tf.Tensor): The input TFRecord data.
+
+    Returns:
+    Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]: Parsed data including window data, adjacency matrix, label, time preread index, and window index.
+    """
+    keys_to_features: Dict[str, tf.io.FixedLenFeature] = {
+        'window': tf.io.FixedLenFeature(cf.feature_shape, tf.float32),
+        'adjacency': tf.io.FixedLenFeature([64, 64], tf.float32),
+        'label': tf.io.FixedLenFeature([1], tf.int64),
+        'time_preread_index': tf.io.FixedLenFeature([1], tf.int64),
+        'window_index': tf.io.FixedLenFeature([1], tf.int64)
+    }
+
+    # Parse the example from the TFRecord
+    data = tf.io.parse_single_example(proto, keys_to_features)
+
+    # Recast the types for 'label', 'time_preread_index', and 'window_index'
+    data['label'] = tf.cast(data['label'], tf.uint8)
+    data['time_preread_index'] = tf.cast(data['time_preread_index'], tf.uint8)
+    data['window_index'] = tf.cast(data['window_index'], tf.uint8)
+
+    return data["window"], data['adjacency'], data['label'], data['time_preread_index'], data['window_index']
+
+def load_tfrecord_to_dataset(tfrecord_path: str) -> tf.data.Dataset:
+    """
+    Load data from a TFRecord file.
+
+    Parameters:
+    tfrecord_path (str): Path to the TFRecord file.
+
+    Returns:
+    tf.data.Dataset: A TensorFlow dataset containing window data, labels, time preread indices, and window indices.
+    """
+    # Create the TFRecord dataset
+    dataset = tf.data.TFRecordDataset(tfrecord_path)
+
+    # Parse the data using `_parse_function`
+    dataset = dataset.map(_parse_function)
+
+    return dataset
+
+def load_tfrecord_to_list(tfrecord_path: str) -> Tuple[
+    List[np.ndarray], List[np.ndarray], List[int], List[int], List[int]]:
+    """
+    Load the TFRecord file and return a dataset.
+
+    Parameters:
+    tfrecord_path (str): Path to the TFRecord file.
+
+    Returns:
+    tuple: A tuple containing window data, adjacency matrix, labels, time preread indices, and window indices as lists.
+    """
+
+    dataset = tf.data.TFRecordDataset(tfrecord_path)
+
+    dataset = dataset.map(_parse_function)
+
+    window_datas: List[np.ndarray] = []
+    adjacencies: List[np.ndarray] = []
+    labels: List[int] = []
+    time_preread_indices: List[int] = []
+    window_indices: List[int] = []
+
+    for window_data, adjacency, label, time_preread_index, window_index in dataset:
+        window_datas.append(window_data.numpy())
+        adjacencies.append(adjacency.numpy())
+        labels.append(label.numpy())
+        time_preread_indices.append(time_preread_index.numpy())
+        window_indices.append(window_index.numpy())
+
+    return window_datas, adjacencies, labels, time_preread_indices, window_indices
 
 # ------------------------------------- #
 #  Start--Database_create--main func    #

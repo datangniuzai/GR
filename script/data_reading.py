@@ -70,28 +70,6 @@ def sEMG_data_read_save():
         print(f"❤️Please rename the folder [{cf.data_path}] to identifier "
               "and complete the details of the [vol_exp_info.json].")
 
-def _parse_function(proto):
-    """
-    解析 TFRecord 文件中的每个 Example，并对数据类型和形状进行调整
-    :param proto: 输入的 TFRecord 数据
-    :return: 解析后的字典，包括窗口数据、标签和其他特征
-    """
-    keys_to_features = {
-        'window': tf.io.FixedLenFeature(cf.feature_shape, tf.float32),
-        'adjacency': tf.io.FixedLenFeature([64,64], tf.float32),
-        'label': tf.io.FixedLenFeature([1], tf.int64),
-        'time_preread_index': tf.io.FixedLenFeature([1], tf.int64),
-        'window_index': tf.io.FixedLenFeature([1], tf.int64)
-    }
-
-    data = tf.io.parse_single_example(proto, keys_to_features)
-    # retype
-    data['label'] = tf.cast(data['label'], tf.uint8)
-    data['time_preread_index'] = tf.cast(data['time_preread_index'], tf.uint8)
-    data['window_index'] = tf.cast(data['window_index'], tf.uint8)
-
-    return data["window"],data['adjacency'], data['label'], data['time_preread_index'], data['window_index']
-
 def generate_volunteer_experiment_info(start_time,end_time):
 
     experiment_info = {
@@ -138,43 +116,4 @@ def generate_volunteer_experiment_info(start_time,end_time):
 
     print(f"实验记录数据已保存至: {file_name}")
 
-def load_tfrecord(tfrecord_path):
-    """
-    从 TFRecord 文件中加载数据
-    :param tfrecord_path: TFRecord 文件的路径
-    :return: 返回一个包含窗口数据、标签、时间先读索引和窗口索引的 TensorFlow 数据集
-    """
-    # 创建 TFRecord 数据集
-    dataset = tf.data.TFRecordDataset(tfrecord_path)
-
-    # 使用 `_parse_function` 解析 TFRecord 中的数据
-    dataset = dataset.map(_parse_function)
-
-    return dataset
-
-def load_tfrecord_list(tfrecord_path):
-    """
-    加载 TFRecord 文件并返回一个数据集
-    :param tfrecord_path: TFRecord 文件路径
-    :return: 一个包含窗口数据、标签和其他特征的 TensorFlow 数据集
-    """
-
-    dataset = tf.data.TFRecordDataset(tfrecord_path)
-
-    dataset = dataset.map(_parse_function)
-
-    window_datas = []
-    adjacencys = []
-    labels = []
-    time_preread_indices = []
-    window_indices = []
-
-    for window_data,adjacency,label, time_preread_index, window_index in dataset:
-        window_datas.append(window_data.numpy())
-        adjacencys.append(adjacency.numpy())
-        labels.append(label.numpy())
-        time_preread_indices.append(time_preread_index.numpy())
-        window_indices.append(window_index.numpy())
-    
-    return window_datas,adjacencys,labels, time_preread_indices, window_indices
 

@@ -245,6 +245,7 @@ def tfrecord_establish(df: np.ndarray, gesture_number:int, dataset_type :str):
     tfrecord_path = os.path.join(save_path, f"data_{gesture_number}_{dataset_type}.tfrecord")
 
     tfrecord_save(dataset,tfrecord_path)
+    cf.feature_shape = window_data_feature[1].shape
 
 def tfrecord_connect():
 

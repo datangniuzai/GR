@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Time : 2024/11/14 19:36
 # @Author : Jiaxuan LI
-# @File : script.py
+# @File : filtering.py
 # @Software: PyCharm
 
 import numpy as np

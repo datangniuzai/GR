@@ -1,20 +1,23 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # @Time : 2024/11/14 19:48
-# @Author : 李 嘉 轩
+# @Author : Jiaxuan LI
 # @File : filtering.py
 # @Software: PyCharm
-
 
 import os
 import numpy as np
 import pandas as pd
+from typing import Any
 import tensorflow as tf
 
 import config as cf
 from data_reading import load_tfrecord
 from filtering import bandpass_and_notch_filter
 
+# ------------------------------------- #
+# Start--Reset Adjacency Functionality  #
+# ------------------------------------- #
 def build_one_adjacency():
     one_adjacency = np.array([
         [0,1,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0],
@@ -84,12 +87,12 @@ def build_one_adjacency():
                     ])
     return one_adjacency
 
-def adj_to_bias(adj, nhood=1):
+def adj_to_bias(adj, nood):
     nb_graphs = adj.shape[0]
     mt = np.empty(adj.shape)
     for g in range(nb_graphs):
         mt[g] = np.eye(adj.shape[1])
-        for _ in range(nhood):
+        for _ in range(nood):
             mt[g] = np.matmul(mt[g], (adj[g] + np.eye(adj.shape[1])))
         for i in range(64):
             for j in range(64):
@@ -121,8 +124,30 @@ def sample_neighbors(adjacency_matrix, num_samples):
             sampled_neighbors[(graph_idx, node)] = sampled_neighbors_idx
     return sampled_neighbors
 
-def z_score_normalize(data):
-    # 通道维度进行归一化，同一特征的不同通道之间被归一化
+def reset_adj(graph_count: int) -> Any:
+    """
+    Generate a bias-adjusted adjacency matrix for a specified number of graphs.
+
+    Args:
+        graph_count (int): The number of graphs to generate adjacency matrices for.
+
+    Returns:
+        Any: A bias-adjusted adjacency matrix suitable for use in graph-based machine learning models.
+    """
+    init_adj = np.array([build_one_adjacency()] * graph_count)
+
+    sampled_adj = sample_neighbors(init_adj, 5)
+
+    filled_adj = fill_new_adjacency_matrix(sampled_adj, graph_count, 64)
+
+    bias_adj = adj_to_bias(filled_adj, 1)
+
+    return bias_adj
+# ------------------------------------- #
+#  Over--Reset Adjacency Functionality  #
+# ------------------------------------- #
+
+def calc_z_score_normalize(data):
     mean_vals = np.mean(data, axis=-2, keepdims=True)
     std_vals = np.std(data, axis=-2, keepdims=True)
     normalized_data = (data - mean_vals) / (std_vals+0.000001)
@@ -176,25 +201,10 @@ def calc_TD(data: np.ndarray) -> np.ndarray:
         features.append(feature.T)
 
     features = np.array(features)
-    z_score_normalize(features)
+    calc_z_score_normalize(features)
     return features
 
-def online_dataset():
-    print("正在处理数据，请稍等")
-    print(
-        f"取第{cf.train_nums}次采集的数据作为训练集，\n"
-        f"取第{cf.test_nums}次采集的数据作为测试集，\n"
-        f"取第{cf.val_nums}次采集的数据作为验证集\n"
-    )
-
-    for gesture_number in cf.gesture:
-        path = cf.data_path + f'original_data/sEMG_data{gesture_number}.csv'
-        df = pd.read_csv(path, header=None).to_numpy().T
-        for dataset_type in ['train','val','test']:
-            dataset_establish(df, gesture_number, dataset_type)
-        print(f"{gesture_number}号手势数据处理完毕")
-
-def dataset_establish(df: np.ndarray, gesture_number:int, dataset_type :str):
+def tfrecord_establish(df: np.ndarray, gesture_number:int, dataset_type :str):
     """
     通用数据处理函数，用于训练集、测试集和验证集的特征提取和保存
     :param df: 输入信号
@@ -204,6 +214,8 @@ def dataset_establish(df: np.ndarray, gesture_number:int, dataset_type :str):
     """
     window_data_feature = []
     window_data_label = []
+    window_data_time_preread_index = []
+    window_data_window_index = []
 
     for read_time in range(1, cf.turn_read_sum + 1):
         if read_time in getattr(cf, f"{dataset_type}_nums"):
@@ -213,24 +225,28 @@ def dataset_establish(df: np.ndarray, gesture_number:int, dataset_type :str):
                 window_data = bandpass_and_notch_filter(window_data)
                 window_data_feature.append(calc_TD(window_data))
                 window_data_label.append(gesture_number - 1)
+                window_data_time_preread_index.append(read_time)
+                window_data_window_index.append(j)
 
-    graph_nums = len(window_data_feature)
-    adjacency = adj_to_bias(fill_new_adjacency_matrix(sample_neighbors(np.array([build_one_adjacency()] * graph_nums),5),graph_nums,64))
+    graph_count = len(window_data_feature)
+    adjacency = reset_adj(graph_count)
 
     window_data_feature_tensor = tf.convert_to_tensor(window_data_feature, dtype=tf.float32)
     adjacency_tensor = tf.convert_to_tensor(adjacency,dtype=tf.float32)
     label_tensor = tf.convert_to_tensor(window_data_label, dtype=tf.uint8)
+    time_preread_index_tensor = tf.convert_to_tensor(window_data_time_preread_index, dtype=tf.uint8)
+    window_index_tensor = tf.convert_to_tensor(window_data_window_index, dtype=tf.uint8)
 
-    dataset = tf.data.Dataset.from_tensor_slices((window_data_feature_tensor,adjacency_tensor,label_tensor))
+    dataset = tf.data.Dataset.from_tensor_slices((window_data_feature_tensor,adjacency_tensor,label_tensor,time_preread_index_tensor,window_index_tensor))
 
     save_path = os.path.join(cf.data_path,"processed_data")
     os.makedirs(save_path, exist_ok=True)
 
     tfrecord_path = os.path.join(save_path, f"data_{gesture_number}_{dataset_type}.tfrecord")
 
-    save_tfrecord(dataset,tfrecord_path)
+    tfrecord_save(dataset,tfrecord_path)
 
-def dataset_connect():
+def tfrecord_connect():
 
     for dataset_type in ['train','test','val']:
 
@@ -247,11 +263,11 @@ def dataset_connect():
 
         connect_tfrecord_save_path = os.path.join(cf.data_path,f"processed_data/data_contact_{dataset_type}.tfrecord")
 
-        save_tfrecord(merged_dataset,connect_tfrecord_save_path)
+        tfrecord_save(merged_dataset,connect_tfrecord_save_path)
 
         print(f"[{dataset_type}]数据已合并并保存在[{connect_tfrecord_save_path}]")
 
-def save_tfrecord(dataset :tf.data.Dataset,tfrecord_save_path:str):
+def tfrecord_save(dataset :tf.data.Dataset,tfrecord_save_path:str):
     """
     将数据集保存为 TFRecord 文件。
 
@@ -263,16 +279,37 @@ def save_tfrecord(dataset :tf.data.Dataset,tfrecord_save_path:str):
     将数据集中的每个项（窗口数据、标签等）转换为 `tf.train.Example` 格式并写入指定的 TFRecord 文件。
     """
     with tf.io.TFRecordWriter(tfrecord_save_path) as writer:
-        for window, adjacency, label in dataset:
+        for window, adjacency, label,time_preread_index, window_index in dataset:
             feature = {
                 'window': tf.train.Feature(float_list=tf.train.FloatList(value=window.numpy().flatten())),
                 'adjacency': tf.train.Feature(float_list=tf.train.FloatList(value=adjacency.numpy().flatten())),
                 'label': tf.train.Feature(int64_list=tf.train.Int64List(value=[label.numpy()])),
+                'time_preread_index': tf.train.Feature(
+                    int64_list=tf.train.Int64List(value=[time_preread_index.numpy()])),
+                'window_index': tf.train.Feature(int64_list=tf.train.Int64List(value=[window_index.numpy()])),
             }
             example = tf.train.Example(features=tf.train.Features(feature=feature))
             writer.write(example.SerializeToString())
 
+# ------------------------------------- #
+#  Start--Database_create--main func    #
+# ------------------------------------- #
 
+def database_create():
+    print("正在处理数据，请稍等")
+    print(
+        f"取第{cf.train_nums}次采集的数据作为训练集，\n"
+        f"取第{cf.test_nums}次采集的数据作为测试集，\n"
+        f"取第{cf.val_nums}次采集的数据作为验证集\n"
+    )
 
+    for gesture_number in cf.gesture:
+        path = cf.data_path + f'original_data/sEMG_data{gesture_number}.csv'
+        df = pd.read_csv(path, header=None).to_numpy().T
+        for dataset_type in ['train','val','test']:
+            tfrecord_establish(df, gesture_number, dataset_type)
+        print(f"{gesture_number}号手势数据处理完毕")
 
-
+# ------------------------------------- #
+#  Over--Database_create--main func     #
+# ------------------------------------- #

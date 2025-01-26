@@ -6,6 +6,7 @@
 # @Software: PyCharm
 
 import os
+import time
 import numpy as np
 import pandas as pd
 from typing import Any
@@ -162,7 +163,10 @@ def calc_TD(data: np.ndarray) -> np.ndarray:
     """
     num_channels, signal_length = data.shape
     num_windows = (signal_length - cf.window_size_little) // cf.step_size_little + 1
+
     features = []
+
+    willison_threshold = 20 / cf.scaling
 
     for i in range(num_windows):
 
@@ -170,41 +174,39 @@ def calc_TD(data: np.ndarray) -> np.ndarray:
         end = start + cf.window_size_little
         windowed_data = data[:, start:end]
 
-        max_possible_rms = np.max(windowed_data) / 2
-        max_possible_mse = (np.max(windowed_data) / 2) ** 2
-        max_possible_zero_crossings = cf.step_size_little - 1
-        max_possible_willison_amplitudes = cf.step_size_little - 1
-
         # Mean Absolute Value (MAV)
         mav = np.mean(np.abs(windowed_data), axis=1)
         # Root Mean Square (RMS)
-        rms = np.sqrt(np.mean(windowed_data ** 2, axis=1)) / max_possible_rms
+        rms = np.sqrt(np.mean(windowed_data ** 2, axis=1))
         # Mean Squared Error (MSE)
-        mse = np.mean((windowed_data - np.sqrt(np.mean(windowed_data ** 2, axis=0))) ** 2, axis=1) / max_possible_mse
-
+        mse = np.mean((windowed_data - np.mean(windowed_data, axis=1, keepdims=True)) ** 2, axis=1)
         # Zero-crossings
-        zero_crossings = []
-        for channel in windowed_data:
-            crossings = (np.sum(np.diff(np.sign(channel)) != 0)) / cf.step_size_little
-            zero_crossings.append(crossings / max_possible_zero_crossings)
-
+        zero_crossings = np.sum(np.diff(np.sign(windowed_data), axis=1) != 0, axis=1)
         # Willison Amplitude (WAMP)
-        threshold = 20 / cf.scaling
-        willison_amplitudes = []
-        for channel in windowed_data:
-            differences = np.diff(channel)
-            willison_amplitude = np.sum(np.abs(differences) > threshold)
-            willison_amplitudes.append(willison_amplitude / max_possible_willison_amplitudes)
-
+        willison_amplitudes = np.sum(np.abs(np.diff(windowed_data, axis=1)) > willison_threshold, axis=1)
         # Stack the features together
-        feature = np.array([mav, rms, mse, np.array(zero_crossings), np.array(willison_amplitudes)])
+        feature = np.array([mav, rms, mse, zero_crossings, willison_amplitudes])
         features.append(feature.T)
 
     features = np.array(features)
-    calc_z_score_normalize(features)
-    return features
 
-def tfrecord_establish(df: np.ndarray, gesture_number:int, dataset_type :str):
+    normalized_features = z_score_normalize_per_feature(features)
+
+    return normalized_features
+
+def z_score_normalize_per_feature(features: np.ndarray) -> np.ndarray:
+    normalized_features = (features - np.mean(features, axis=(0, 1), keepdims=True)) / np.std(features, axis=(0, 1), keepdims=True)
+    return normalized_features
+
+def z_score_normalize_per_channel(features: np.ndarray) -> np.ndarray:
+    normalized_features = (features - np.mean(features, axis=(0, 2), keepdims=True)) / np.std(features, axis=(0, 2), keepdims=True)
+    return normalized_features
+
+def z_score_normalize_per_window(features: np.ndarray) -> np.ndarray:
+    normalized_features = (features - np.mean(features, axis=(1, 2), keepdims=True)) / np.std(features, axis=(1, 2), keepdims=True)
+    return normalized_features
+
+def tfrecord_establish(df: np.ndarray, gesture_number: int, dataset_type: str):
     """
     通用数据处理函数，用于训练集、测试集和验证集的特征提取和保存
     :param df: 输入信号
@@ -217,34 +219,40 @@ def tfrecord_establish(df: np.ndarray, gesture_number:int, dataset_type :str):
     window_data_time_preread_index = []
     window_data_window_index = []
 
+    start_time = time.time()
+
     for read_time in range(1, cf.turn_read_sum + 1):
         if read_time in getattr(cf, f"{dataset_type}_nums"):
-            single_acqui_data = df[:,(read_time - 1) * (cf.time_preread * cf.sample_rate):read_time * (cf.time_preread * cf.sample_rate)]
+            single_acqui_data = df[:, (read_time - 1) * (cf.time_preread * cf.sample_rate):read_time * (
+                        cf.time_preread * cf.sample_rate)]
+            single_acqui_data = bandpass_and_notch_filter(single_acqui_data)
             for j in range(0, single_acqui_data.shape[1] - cf.window_size + 1, cf.step_size):
                 window_data = single_acqui_data[:, j:j + cf.window_size]
-                window_data = bandpass_and_notch_filter(window_data)
                 window_data_feature.append(calc_TD(window_data))
                 window_data_label.append(gesture_number - 1)
                 window_data_time_preread_index.append(read_time)
                 window_data_window_index.append(j)
 
+    print("Total time for for-loop:", time.time() - start_time)
+
     graph_count = len(window_data_feature)
     adjacency = reset_adj(graph_count)
 
     window_data_feature_tensor = tf.convert_to_tensor(window_data_feature, dtype=tf.float32)
-    adjacency_tensor = tf.convert_to_tensor(adjacency,dtype=tf.float32)
+    adjacency_tensor = tf.convert_to_tensor(adjacency, dtype=tf.float32)
     label_tensor = tf.convert_to_tensor(window_data_label, dtype=tf.uint8)
     time_preread_index_tensor = tf.convert_to_tensor(window_data_time_preread_index, dtype=tf.uint8)
     window_index_tensor = tf.convert_to_tensor(window_data_window_index, dtype=tf.uint8)
 
-    dataset = tf.data.Dataset.from_tensor_slices((window_data_feature_tensor,adjacency_tensor,label_tensor,time_preread_index_tensor,window_index_tensor))
+    dataset = tf.data.Dataset.from_tensor_slices(
+        (window_data_feature_tensor, adjacency_tensor, label_tensor, time_preread_index_tensor, window_index_tensor))
 
-    save_path = os.path.join(cf.data_path,"processed_data")
+    save_path = os.path.join(cf.data_path, "processed_data")
     os.makedirs(save_path, exist_ok=True)
 
     tfrecord_path = os.path.join(save_path, f"data_{gesture_number}_{dataset_type}.tfrecord")
+    tfrecord_save(dataset, tfrecord_path)
 
-    tfrecord_save(dataset,tfrecord_path)
     cf.feature_shape = window_data_feature[1].shape
 
 def tfrecord_connect():

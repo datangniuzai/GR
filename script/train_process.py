@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score, confusion_matrix, recall_score
 
 import config as cf
-from data_reading import load_tfrecord_list
+from dataset import load_tfrecord_to_list
 
 def model_train():
 
@@ -47,8 +47,8 @@ def model_train():
         cf.training_info_path + f'save_model/model_' + '{epoch:02d}.keras',
         save_weights_only=False, save_best_only=False, verbose=1)
 
-    x_val, adjacency_val,y_val, x_p , x_t = load_tfrecord_list(cf.data_path + "processed_data/data_contact_val.tfrecord")
-    x_train, adjacency_train,y_train, v_p , v_t = load_tfrecord_list(cf.data_path + "processed_data/data_contact_train.tfrecord")
+    x_val, adjacency_val,y_val, x_p , x_t = load_tfrecord_to_list(cf.data_path + "processed_data/data_contact_val.tfrecord")
+    x_train, adjacency_train,y_train, v_p , v_t = load_tfrecord_to_list(cf.data_path + "processed_data/data_contact_train.tfrecord")
     train_dataset = tf.data.Dataset.from_tensor_slices(((adjacency_train,x_train),y_train)).shuffle(len(x_train)).batch(32)
     val_dataset = tf.data.Dataset.from_tensor_slices(((adjacency_val,x_val),y_val)).batch(16)
     cf.history = cf.model.fit(train_dataset, validation_data=val_dataset, epochs=cf.epochs,
@@ -57,7 +57,7 @@ def model_train():
 def Plot_matrix():
     cf.training_info_path = "2024.12.21/2024-12-25_14-21-06/"
     model_path = cf.training_info_path+"save_model/model_17.keras"
-    x_test,adjacency_test, y_test,x_p,x_t = load_tfrecord_list(cf.data_path + "processed_data/data_contact_test.tfrecord")
+    x_test,adjacency_test, y_test,x_p,x_t = load_tfrecord_to_list(cf.data_path + "processed_data/data_contact_test.tfrecord")
     x_test_tensor = tf.convert_to_tensor(x_test, dtype=tf.float32)
     adjacency_test_tensor = tf.convert_to_tensor(adjacency_test,dtype=tf.float32)
     cf.model.load_weights(model_path)
@@ -92,7 +92,7 @@ def Plot_loos_acc_matrix_test():
 
     history_file_path = os.path.join(history_info_save_path, f'training_history.csv')
 
-    x_test, adjacency_test,y_test, time_preread_indices, window_indices = load_tfrecord_list(
+    x_test, adjacency_test,y_test, time_preread_indices, window_indices = load_tfrecord_to_list(
         cf.data_path + "processed_data/data_contact_test.tfrecord")
     x_test_tensor = tf.convert_to_tensor(x_test, dtype=tf.float32)
     adjacency_test_tensor = tf.convert_to_tensor(adjacency_test,dtype=tf.float32)
@@ -210,7 +210,7 @@ def Plot_loos_acc_matrix():
 
     history_file_path = os.path.join(cf.training_info_path, f'Training_Information/training_history.csv')
 
-    x_test, y_test, time_preread_indices, window_indices = load_tfrecord_list(
+    x_test, y_test, time_preread_indices, window_indices = load_tfrecord_to_list(
         cf.data_path + "processed_data/data_contact_test.tfrecord")
     x_test_tensor = tf.convert_to_tensor(x_test, dtype=tf.float32)
     test_dataset = tf.data.Dataset.from_tensor_slices((x_test, y_test)).batch(32)

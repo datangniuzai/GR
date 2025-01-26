@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # @Time : 2024/11/14 19:43
-# @Author : 李 嘉 轩
+# @Author : Jiaxuan LI
 # @File : filtering.py
 # @Software: PyCharm
 
@@ -13,7 +13,6 @@ import struct
 import pyttsx3
 import datetime
 import numpy as np
-import tensorflow as tf
 
 import config as cf
 

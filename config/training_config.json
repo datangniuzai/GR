@@ -10,7 +10,7 @@
     "gesture_rest_duration":60
   },
   "data_process_parameters": {
-    "data_path": "250114-W-Man-S-26",
+    "data_path": "data/250114-W-Man-S-26",
     "window_size": 400,
     "step_size": 100,
     "window_size_little": 100,

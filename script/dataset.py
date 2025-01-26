@@ -231,12 +231,11 @@ def tfrecord_establish(df: np.ndarray, gesture_number: int, dataset_type: str):
     :param dataset_type: Type of dataset ('train'/'test'/'val')
     :return: The element_spec of the dataset
     """
+
     window_data_feature = []
     window_data_label = []
     window_data_time_preread_index = []
     window_data_window_index = []
-
-    start_time = time.time()
 
     for read_time in range(1, cf.turn_read_sum + 1):
         if read_time in getattr(cf, f"{dataset_type}_nums"):
@@ -249,8 +248,6 @@ def tfrecord_establish(df: np.ndarray, gesture_number: int, dataset_type: str):
                 window_data_label.append(gesture_number - 1)
                 window_data_time_preread_index.append(read_time)
                 window_data_window_index.append(j)
-
-    print("Total time for for-loop:", time.time() - start_time)
 
     graph_count = len(window_data_feature)
     adjacency = reset_adj(graph_count)

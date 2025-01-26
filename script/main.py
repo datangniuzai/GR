@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 # @Time : 2024/1/11 23:20
-# @Author : 赵 雨 新
+# @Author : Yuxin Zhao
 # @File : train_process.py
 # @Software: Vscode
+
+import os
+os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 
 import time
 import config as cf

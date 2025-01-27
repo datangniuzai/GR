@@ -6,11 +6,11 @@
 # @Software: PyCharm
 
 import os
-import time
+
 import numpy as np
 import pandas as pd
-from typing import Any, List, Tuple, Dict
 import tensorflow as tf
+from typing import Any, List, Tuple, Dict
 
 import config as cf
 from filtering import bandpass_and_notch_filter
@@ -18,6 +18,7 @@ from filtering import bandpass_and_notch_filter
 # ------------------------------ #
 # Reset Adjacency Functionality  #
 # ------------------------------ #
+
 def build_one_adjacency():
     one_adjacency = np.array([
         [0,1,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0],
@@ -148,7 +149,7 @@ def reset_adj(graph_count: int) -> Any:
 #   Feature Extraction Function  #
 # ------------------------------ #
 
-def calc_TD(data: np.ndarray) -> np.ndarray:
+def calc_td(data: np.ndarray) -> np.ndarray:
     """
     Extract only time-domain features, add small windows. Feature order: MAV, RMS, MSE, Zero-crossings, WAMP.
 
@@ -244,7 +245,7 @@ def tfrecord_establish(df: np.ndarray, gesture_number: int, dataset_type: str):
             single_acqui_data = bandpass_and_notch_filter(single_acqui_data)
             for j in range(0, single_acqui_data.shape[1] - cf.window_size + 1, cf.step_size):
                 window_data = single_acqui_data[:, j:j + cf.window_size]
-                window_data_feature.append(calc_TD(window_data))
+                window_data_feature.append(calc_td(window_data))
                 window_data_label.append(gesture_number - 1)
                 window_data_time_preread_index.append(read_time)
                 window_data_window_index.append(j)
@@ -306,13 +307,14 @@ def tfrecord_save(dataset :tf.data.Dataset,tfrecord_save_path:str):
             feature = {
                 'window': tf.train.Feature(float_list=tf.train.FloatList(value=window.numpy().flatten())),
                 'adjacency': tf.train.Feature(float_list=tf.train.FloatList(value=adjacency.numpy().flatten())),
-                'label': tf.train.Feature(int64_list=tf.train.Int64List(value=[label.numpy()])),
+                'label': tf.train.Feature(int64_list=tf.train.Int64List(value=[label.numpy().item()])),
                 'time_preread_index': tf.train.Feature(
-                    int64_list=tf.train.Int64List(value=[time_preread_index.numpy()])),
-                'window_index': tf.train.Feature(int64_list=tf.train.Int64List(value=[window_index.numpy()])),
+                    int64_list=tf.train.Int64List(value=[time_preread_index.numpy().item()])),
+                'window_index': tf.train.Feature(int64_list=tf.train.Int64List(value=[window_index.numpy().item()])),
             }
             example = tf.train.Example(features=tf.train.Features(feature=feature))
             writer.write(example.SerializeToString())
+
 # ----------------------------- #
 #   Tfrecord Loading Function   #
 # ----------------------------- #

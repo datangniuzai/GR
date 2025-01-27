@@ -5,12 +5,13 @@
     "collector_number": 1,
     "gesture_read_count_per_instance": 20,
     "read_duration_per_instance": 4,
-    "gesture_sequence":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26],
+    "gesture_read_sequence":[1,2,3],
     "action_rest_duration": 12,
     "gesture_rest_duration":60
   },
   "data_process_parameters": {
     "data_path": "data/250114-W-Man-S-26",
+    "gesture_train_sequence":[1,2],
     "window_size": 400,
     "step_size": 100,
     "window_size_little": 100,

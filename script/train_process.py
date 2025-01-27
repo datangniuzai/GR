@@ -5,16 +5,18 @@
 # @File : train_process.py
 # @Software: PyCharm
 
+import os
 import csv
 import datetime
-import os
 import warnings
+from typing import List
 
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import tensorflow as tf
 import matplotlib.pyplot as plt
+from keras.callbacks import History
 from sklearn.metrics import accuracy_score, confusion_matrix, recall_score
 
 import config as cf
@@ -65,8 +67,37 @@ def make_train_folder() -> str:
 
     return os.path.join(cf.data_path, folder_name) + "/"
 
-def save_train_history(history):
+def _call_all_models():
+    # todo[1]提供一个方法反复加载模型
+    pass
+def get_models_list(models_folder_path: str) -> List[str]:
+    """
+    Retrieve all file names from a specified folder.
 
+    :param models_folder_path: str, Path to the folder.
+    :return: List[str], List of file names in the folder.
+    """
+    try:
+        file_names = [f for f in os.listdir(models_folder_path) if os.path.isfile(os.path.join(models_folder_path, f))]
+        return file_names
+    except FileNotFoundError:
+        print(f"Error: Folder '{models_folder_path}' not found.")
+        return []
+    except PermissionError:
+        print(f"Error: No permission to access folder '{models_folder_path}'.")
+        return []
+
+# --------------- #
+#  Save Functions #
+# --------------- #
+
+def save_train_history(history: History) -> str:
+    """
+    Save the training history to a CSV file.
+
+    :param history: History, History object generated during model training.
+    :return: str, Path to the saved CSV file.
+    """
     history_df = pd.DataFrame(history.history)
 
     training_info_csv_path = cf.training_info_path + "training_information/training_history.csv"
@@ -75,7 +106,7 @@ def save_train_history(history):
 
     return training_info_csv_path
 
-def save_training_config() -> None:
+def save_train_config() -> None:
     """
     Save training configuration details to a text file in cf.training_info_path.
     The file will be named "training_info.txt".
@@ -115,37 +146,10 @@ def save_test_info():
 def save_test_confusion_matrix():
     # todo[1]: 将测试集在所有模型上的混淆矩阵进行计算保存
     pass
-def get_models_list():
-    # todo[1]: 获取所有模型列表
-    pass
-def _call_all_models():
-    # todo[1]提供一个方法反复加载模型
-    pass
-def model_train():
 
-    cf.training_info_path = make_train_folder()
-
-    print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))
-
-    x_val, adjacency_val, y_val, *unused = load_tfrecord_to_list(cf.data_path + "processed_data/data_contact_val.tfrecord")
-    x_train, adjacency_train, y_train, *unused = load_tfrecord_to_list(cf.data_path + "processed_data/data_contact_train.tfrecord")
-    train_dataset = tf.data.Dataset.from_tensor_slices(((adjacency_train,x_train),y_train)).shuffle(len(x_train)).batch(32)
-    val_dataset = tf.data.Dataset.from_tensor_slices(((adjacency_val,x_val),y_val)).batch(16)
-
-    model_save_path = cf.training_info_path + f'models/model_' + '{epoch:02d}.keras'
-    save_model_path_callback=SaveModelPathCallback(model_save_path)
-    model_checkpoint = tf.keras.callbacks.ModelCheckpoint(
-        filepath=model_save_path,
-        save_weights_only=False,
-        save_best_only=False,
-        verbose=1
-    )
-
-    history = cf.model.fit(train_dataset, validation_data=val_dataset, epochs=cf.epochs,
-                        callbacks=[model_checkpoint,save_model_path_callback])
-
-    cf.training_info_csv_path = save_train_history(history)
-
+# --------------- #
+#  Plot Functions #
+# --------------- #
 def plot_loss_acc(training_info_csv_path: str = None, fig_save_path: str = None) -> None:
     """
     This function plots training and validation loss and accuracy curves from a CSV file and saves the figure.
@@ -472,6 +476,31 @@ def Plot_loos_acc_matrix():
 
     cf.model_name = cf.model.name
 
+# ---------------- #
+#  Train Functions #
+# ---------------- #
 
+def model_train():
 
+    cf.training_info_path = make_train_folder()
 
+    print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))
+
+    x_val, adjacency_val, y_val, *unused = load_tfrecord_to_list(cf.data_path + "processed_data/data_contact_val.tfrecord")
+    x_train, adjacency_train, y_train, *unused = load_tfrecord_to_list(cf.data_path + "processed_data/data_contact_train.tfrecord")
+    train_dataset = tf.data.Dataset.from_tensor_slices(((adjacency_train,x_train),y_train)).shuffle(len(x_train)).batch(32)
+    val_dataset = tf.data.Dataset.from_tensor_slices(((adjacency_val,x_val),y_val)).batch(16)
+
+    model_save_path = cf.training_info_path + f'models/model_' + '{epoch:02d}.keras'
+    save_model_path_callback=SaveModelPathCallback(model_save_path)
+    model_checkpoint = tf.keras.callbacks.ModelCheckpoint(
+        filepath=model_save_path,
+        save_weights_only=False,
+        save_best_only=False,
+        verbose=1
+    )
+
+    history = cf.model.fit(train_dataset, validation_data=val_dataset, epochs=cf.epochs,
+                        callbacks=[model_checkpoint,save_model_path_callback])
+
+    cf.training_info_csv_path = save_train_history(history)

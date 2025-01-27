@@ -83,6 +83,20 @@ def get_models_list(models_folder_path: str) -> List[str]:
         print(f"Error: No permission to access folder '{models_folder_path}'.")
         return []
 
+def generate_unique_file_path(file_save_path: str, extension: str) -> str :
+
+    existing_files = os.listdir(file_save_path)
+    base_filename = "confusion_matrix"
+    extension = extension
+    counter = 1
+    new_file_path = os.path.join(file_save_path, f"{base_filename}_{counter}{extension}")
+
+    while new_file_path in existing_files:
+        new_file_path = os.path.join(file_save_path, f"{base_filename}_{counter}{extension}")
+        counter += 1
+
+    return new_file_path
+
 # --------------- #
 #  Save Functions #
 # --------------- #
@@ -200,7 +214,6 @@ def plot_loss_acc(training_info_csv_path: str = None, fig_save_path: str = None)
     plt.close()
 
 def plot_confusion_matrix(data_test_path: str = None, model_path: str = None, fig_save_path: str = None) -> None:
-
     if data_test_path is None:
         if hasattr(cf, 'data_path') and cf.data_path is not None:
             data_test_path = os.path.join(cf.data_path, "processed_data", "data_contact_test.tfrecord")
@@ -215,9 +228,11 @@ def plot_confusion_matrix(data_test_path: str = None, model_path: str = None, fi
 
     if fig_save_path is None:
         if hasattr(cf, 'training_info_path') and cf.training_info_path is not None:
-            data_test_path = os.path.join(cf.training_info_path, "figures", "confusion_matrix_test.svg")
+            fig_save_path = os.path.join(cf.training_info_path, "figures")
         else:
             raise ValueError("The 'fig_save_path' is not set.")
+
+    fig_save_path = generate_unique_file_path(file_save_path=fig_save_path, extension= ".svg")
 
     cf.model.load_weights(model_path)
 
@@ -231,7 +246,6 @@ def plot_confusion_matrix(data_test_path: str = None, model_path: str = None, fi
     cm_sum = np.sum(cm, axis=1, keepdims=True)
     cm_perc = cm / cm_sum.astype(float) * 100
 
-    # Do not display all zeros in the confusion matrix as annotations.
     annot = np.zeros_like(cm_perc, dtype=object)
     for i in range(cm_perc.shape[0]):
         for j in range(cm_perc.shape[1]):
@@ -241,12 +255,10 @@ def plot_confusion_matrix(data_test_path: str = None, model_path: str = None, fi
                 annot[i, j] = ""
 
     plt.figure(figsize=(15, 12))
-    sns.heatmap(cm_perc, annot=annot, cmap="YlGnBu", fmt="", linewidths=1, square=True,
-                annot_kws={"fontsize": 12})
+    sns.heatmap(cm_perc, annot=annot, cmap="YlGnBu", fmt="", linewidths=1, square=True, annot_kws={"fontsize": 12})
     plt.xlabel('Predicted label', fontsize=14)
     plt.ylabel('True label', fontsize=14)
     plt.title(f'Accuracy: {accuracy * 100:.2f}%', fontsize=16)
-    plt.show()
 
     plt.savefig(fig_save_path, format='svg')
     plt.close()
@@ -279,6 +291,9 @@ def model_train():
                         callbacks=[model_checkpoint,save_model_path_callback])
 
     cf.training_info_csv_path = save_train_history(history)
+    models_folder_path = os.path.join(cf.training_info_path, "models")
+    fig_save_path = os.path.join(cf.training_info_path, "figures")
+    test_all_models(models_folder_path, fig_save_path)
 
 def test_all_models(models_folder_path: str,fig_save_path: str) -> None:
 

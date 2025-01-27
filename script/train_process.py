@@ -34,7 +34,14 @@ class SaveModelPathCallback(tf.keras.callbacks.Callback):
 
         print(f"Model saved at: {model_path}")
 
-def make_train_folder():
+def make_train_folder() -> str:
+    """
+    Creates a training folder structure with subdirectories for saving pictures, models, error data,
+    training information, test data, and figures. The folder is named with the current date and time.
+
+    Returns:
+    - str: The path of the main training folder created.
+    """
 
     current_time = datetime.datetime.now()
     folder_name = current_time.strftime("%Y-%m-%d_%H-%M-%S")
@@ -42,23 +49,81 @@ def make_train_folder():
     main_folder_path = os.path.join(cf.data_path, folder_name)
     os.makedirs(main_folder_path, exist_ok=True)
 
-    picture_folder_path = os.path.join(main_folder_path, "Picture")
-    model_folder_path = os.path.join(main_folder_path, "save_model")
-    error_data_information = os.path.join(main_folder_path, "Error_Data_Information")
-    training_information = os.path.join(main_folder_path, "Training_Information")
-    test_folder_path = os.path.join(main_folder_path, "Test")
+    picture_folder_path = os.path.join(main_folder_path, "picture")
+    model_folder_path = os.path.join(main_folder_path, "models")
+    error_data_information = os.path.join(main_folder_path, "error_data_information")
+    training_information = os.path.join(main_folder_path, "training_information")
+    test_folder_path = os.path.join(main_folder_path, "test")
+    figures_folder_path = os.path.join(main_folder_path, "figures")
 
     os.makedirs(picture_folder_path, exist_ok=True)
     os.makedirs(model_folder_path, exist_ok=True)
     os.makedirs(error_data_information, exist_ok=True)
     os.makedirs(training_information, exist_ok=True)
     os.makedirs(test_folder_path, exist_ok=True)
+    os.makedirs(figures_folder_path, exist_ok=True)
 
-    cf.training_info_path = cf.data_path + folder_name + "/"
+    return os.path.join(cf.data_path, folder_name) + "/"
 
+def save_train_history(history):
+
+    history_df = pd.DataFrame(history.history)
+
+    training_info_csv_path = cf.training_info_path + "training_information/training_history.csv"
+
+    history_df.to_csv(training_info_csv_path, index=False)
+
+    return training_info_csv_path
+
+def save_training_config() -> None:
+    """
+    Save training configuration details to a text file in cf.training_info_path.
+    The file will be named "training_info.txt".
+    """
+
+    training_time = (cf.end_time - cf.start_time) / 60
+
+    path_save_training_config = os.path.join(cf.training_info_path, f'training_information/training_info.txt')
+    os.makedirs(os.path.dirname(path_save_training_config), exist_ok=True)
+
+    with open(path_save_training_config, 'w') as file:
+        file.write(f'Gesture numbers: {cf.gesture}\n')
+        file.write(f'Dataset mode: {cf.tvt_select_mode}\n')
+        file.write(f'Training time: {training_time:.2f} minutes\n')
+        file.write(f'Training samples: {cf.train_num}\n')
+        file.write(f'Test data locations: {cf.test_nums}\n')
+        file.write(f'Validation data locations: {cf.val_nums}\n')
+        file.write(f'Training data locations: {cf.train_nums}\n')
+        file.write(f'Test samples: {cf.test_num}\n')
+        file.write(f'Validation samples: {cf.val_num}\n')
+        file.write(f'Window size: {cf.window_size}\n')
+        file.write(f'Window step size: {cf.step_size}\n')
+        file.write(f'Small window size: {cf.window_size_little}\n')
+        file.write(f'Small window step size: {cf.step_size_little}\n')
+        file.write(f'Epochs: {cf.epochs}\n')
+        file.write(f'Scaling factor: {cf.scaling}\n')
+        file.write(f'Model: {cf.model_name}\n')
+
+    print(f"Total training time: {training_time:.2f} minutes")
+    print("Training completed!")
+    print(f"Saved training info to: {path_save_training_config}\n")
+
+def save_test_info():
+    # todo[1]: 将测试集在所有模型上的正确率补充进csv文件
+    # todo[2]: 将recall率添加入csv文件
+    pass
+def save_test_confusion_matrix():
+    # todo[1]: 将测试集在所有模型上的混淆矩阵进行计算保存
+    pass
+def get_models_list():
+    # todo[1]: 获取所有模型列表
+    pass
+def _call_all_models():
+    # todo[1]提供一个方法反复加载模型
+    pass
 def model_train():
 
-    make_train_folder()
+    cf.training_info_path = make_train_folder()
 
     print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))
 
@@ -67,7 +132,7 @@ def model_train():
     train_dataset = tf.data.Dataset.from_tensor_slices(((adjacency_train,x_train),y_train)).shuffle(len(x_train)).batch(32)
     val_dataset = tf.data.Dataset.from_tensor_slices(((adjacency_val,x_val),y_val)).batch(16)
 
-    model_save_path = cf.training_info_path + f'save_model/model_' + '{epoch:02d}.keras'
+    model_save_path = cf.training_info_path + f'models/model_' + '{epoch:02d}.keras'
     save_model_path_callback=SaveModelPathCallback(model_save_path)
     model_checkpoint = tf.keras.callbacks.ModelCheckpoint(
         filepath=model_save_path,
@@ -76,30 +141,89 @@ def model_train():
         verbose=1
     )
 
-    cf.history = cf.model.fit(train_dataset, validation_data=val_dataset, epochs=cf.epochs,
+    history = cf.model.fit(train_dataset, validation_data=val_dataset, epochs=cf.epochs,
                         callbacks=[model_checkpoint,save_model_path_callback])
 
-    save_train_history()
+    cf.training_info_csv_path = save_train_history(history)
 
-def save_train_history():
-    history_df = pd.DataFrame(cf.history.history)
-    csv_file_path = "training_history.csv"
-    history_df.to_csv(csv_file_path, index=False)
+def plot_loss_acc(training_info_csv_path: str = None, fig_save_path: str = None) -> None:
+    """
+    This function plots training and validation loss and accuracy curves from a CSV file and saves the figure.
 
-def plot_confusion_matrix(training_info_path= None,model_path= None):
+    Parameters:
+    - csv_file_path (str, optional): Path to the CSV file containing training history data.
+    - fig_save_path (str, optional): Path where the figure will be saved.
+    """
 
-    if training_info_path is not None:
-        cf.training_info_path = training_info_path + "/"
+    # Set default CSV file path if not provided
+    if training_info_csv_path is None:
+        if not hasattr(cf, 'training_info_path') or cf.training_info_path is None:
+            raise ValueError("The 'training_info_path' is not set.")
+        training_info_csv_path = os.path.join(cf.training_info_path, "training_information", "training_history.csv")
+
+    # Set default figure save path if not provided
+    if fig_save_path is None:
+        if not hasattr(cf, 'training_info_path') or cf.training_info_path is None:
+            raise ValueError("The 'training_info_path' is not set.")
+        fig_save_path = os.path.join(cf.training_info_path, "figures", "training_history.svg")
+
+    # Check if the CSV file exists
+    if not os.path.exists(training_info_csv_path):
+        raise FileNotFoundError(f"The CSV file '{training_info_csv_path}' was not found.")
+
+    data = pd.read_csv(training_info_csv_path)
+
+    loss = data['loss']
+    accuracy = data['accuracy']
+    val_loss = data['val_loss']
+    val_accuracy = data['val_accuracy']
+
+    plt.figure(figsize=(12, 4))
+
+    # Plot training and validation accuracy
+    plt.subplot(1, 2, 1)
+    plt.plot(accuracy, label='Train Accuracy')
+    plt.plot(val_accuracy, label='Validation Accuracy')
+    plt.title('Model Accuracy')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.legend(loc='upper left')
+
+    # Plot training and validation loss
+    plt.subplot(1, 2, 2)
+    plt.plot(loss, label='Train Loss')
+    plt.plot(val_loss, label='Validation Loss')
+    plt.title('Model Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.legend(loc='upper left')
+
+    os.makedirs(os.path.dirname(fig_save_path), exist_ok=True)
+    plt.savefig(fig_save_path, format='svg')
+    plt.close()
+
+def plot_confusion_matrix(data_test_path: str = None, model_path: str = None, fig_save_path: str = None) -> None:
+
+    if data_test_path is not None:
+        if not hasattr(cf, 'data_path') or cf.data_path is None:
+            raise ValueError("The 'data_path' is not set.")
+        data_test_path = os.path.join(cf.data_path, "processed_data", "data_contact_test.tfrecord")
+
     if model_path is not None:
-        cf.model_path = model_path
+        if not hasattr(cf, 'model_path') or cf.model_path is None:
+            raise ValueError("The 'model_path' is not set.")
+        model_path = cf.model_path
 
-    cf.model.load_weights(cf.model_path)
+    if fig_save_path is None:
+        if not hasattr(cf, 'training_info_path') or cf.training_info_path is None:
+            raise ValueError("The 'fig_save_path' is not set.")
+        data_test_path = os.path.join(cf.training_info_path,"figures","confusion_matrix_test.svg")
 
-    data_test_path= cf.data_path + "processed_data/data_contact_test.tfrecord"
+    cf.model.load_weights(model_path)
 
-    tensor_x_test, tensor_adjacency_test, tensor_y_test= load_tfrecord_data_adjacency_label(data_test_path)
+    tensor_x_test, tensor_adjacency_test, tensor_y_test = load_tfrecord_data_adjacency_label(data_test_path)
 
-    y_pred_prob = cf.model.predict([tensor_adjacency_test,tensor_x_test])
+    y_pred_prob = cf.model.predict([tensor_adjacency_test, tensor_x_test])
     y_pred = np.argmax(y_pred_prob, axis=1)
 
     accuracy = accuracy_score(tensor_y_test, y_pred)
@@ -107,41 +231,31 @@ def plot_confusion_matrix(training_info_path= None,model_path= None):
     cm_sum = np.sum(cm, axis=1, keepdims=True)
     cm_perc = cm / cm_sum.astype(float) * 100
 
-    plt.figure(figsize=(10, 8))
-    sns.heatmap(cm_perc, annot=True, cmap="YlGnBu", fmt=".1f", linewidths=.5, square=True,annot_kws={"fontsize": 12})
+    # Do not display all zeros in the confusion matrix as annotations.
+    annot = np.zeros_like(cm_perc, dtype=object)
+    for i in range(cm_perc.shape[0]):
+        for j in range(cm_perc.shape[1]):
+            if cm_perc[i, j] != 0:
+                annot[i, j] = f"{cm_perc[i, j]:.2f}"
+            else:
+                annot[i, j] = ""
+
+    plt.figure(figsize=(15, 12))
+    sns.heatmap(cm_perc, annot=annot, cmap="YlGnBu", fmt=".1f", linewidths=1, square=True,
+                annot_kws={"fontsize": 12})
     plt.xlabel('Predicted label', fontsize=14)
     plt.ylabel('True label', fontsize=14)
-    plt.title(f'Confusion Matrix (Accuracy: {accuracy * 100:.2f}%)', fontsize=16)
+    plt.title(f'Accuracy: {accuracy * 100:.2f}%', fontsize=16)
     plt.show()
 
-def plot_loss_acc():
-
-    plt.figure(figsize=(12, 4))
-    plt.subplot(1, 2, 1)
-    plt.plot(cf.history.history['accuracy'])
-    plt.plot(cf.history.history['val_accuracy'])
-    plt.title('Model Accuracy')
-    plt.xlabel('Epoch')
-    plt.ylabel('Accuracy')
-    plt.legend(['Train', 'Validation'], loc='upper left')
-
-    plt.subplot(1, 2, 2)
-    plt.plot(cf.history.history['loss'])
-    plt.plot(cf.history.history['val_loss'])
-    plt.title('Model Loss')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.legend(['Train', 'Validation'], loc='upper left')
-    plt.savefig(cf.training_info_path + f'picture/loss_acc.svg', format='svg')
+    plt.savefig(fig_save_path, format='svg')
     plt.close()
-
-    history_file_path = os.path.join(cf.training_info_path, f'Training_Information/training_history.csv')
 
 def Plot_loos_acc_matrix_test(training_info_path= None):
     if not cf.training_info_path:
         warnings.warn("Warning: training_info_path is not set!")
 
-    test_save_path = os.path.join(cf.training_info_path, "Test")
+    test_save_path = os.path.join(cf.training_info_path, "test")
 
     current_time = datetime.datetime.now()
     test_folder_name = current_time.strftime("%Y-%m-%d_%H-%M-%S")
@@ -157,7 +271,7 @@ def Plot_loos_acc_matrix_test(training_info_path= None):
     adjacency_test_tensor = tf.convert_to_tensor(adjacency_test,dtype=tf.float32)
     print(adjacency_test_tensor.shape)
     # Retrieve and sort all files starting with "model_" in the directory;
-    model_files = [f for f in os.listdir(cf.training_info_path + 'save_model/') if
+    model_files = [f for f in os.listdir(cf.training_info_path + 'models/') if
                    f.startswith(f'model_')]
 
     # returns a sorted list of filenames.
@@ -177,7 +291,7 @@ def Plot_loos_acc_matrix_test(training_info_path= None):
 
         for epoch, model in enumerate(model_files):
 
-            model_path = os.path.join(cf.training_info_path, 'save_model', model)
+            model_path = os.path.join(cf.training_info_path, 'models', model)
 
             cf.model.load_weights(model_path)
 
@@ -266,14 +380,14 @@ def Plot_loos_acc_matrix():
     plt.savefig(cf.training_info_path + f'picture/loss_acc.svg', format='svg')
     plt.close()
 
-    history_file_path = os.path.join(cf.training_info_path, f'Training_Information/training_history.csv')
+    history_file_path = os.path.join(cf.training_info_path, f'training_information/training_history.csv')
 
     x_test, adjacency_test, y_test, read_indices_test, window_indices_test = load_tfrecord_to_list(
         cf.data_path + "processed_data/data_contact_test.tfrecord")
     x_test_tensor = tf.convert_to_tensor(x_test, dtype=tf.float32)
     test_dataset = tf.data.Dataset.from_tensor_slices((x_test, y_test)).batch(32)
 
-    model_files = [f for f in os.listdir(cf.training_info_path + 'save_model/') if
+    model_files = [f for f in os.listdir(cf.training_info_path + 'models/') if
                    f.startswith(f'model_')]
 
     # returns a sorted list of filenames.
@@ -289,7 +403,7 @@ def Plot_loos_acc_matrix():
 
         for epoch, model in enumerate(model_files):
 
-            model_path = os.path.join(cf.training_info_path, 'save_model', model)
+            model_path = os.path.join(cf.training_info_path, 'models', model)
 
             cf.model.load_weights(model_path)
 
@@ -333,7 +447,7 @@ def Plot_loos_acc_matrix():
             failure_labels = [y_test[i] for i in failure_indices]
             failure_predicted_labels = [y_pred[i] for i in failure_indices]
             failure_file_path = os.path.join(cf.training_info_path,
-                                             f'Error_Data_Information/failure_indices_{model}.csv')
+                                             f'error_data_information/failure_indices_{model}.csv')
 
             with open(failure_file_path, 'w', newline='') as failure_file:
                 failure_writer = csv.writer(failure_file)
@@ -358,35 +472,6 @@ def Plot_loos_acc_matrix():
 
     cf.model_name = cf.model.name
 
-    training_time = (cf.end_time - cf.start_time) / 60
 
-    with open(cf.training_info_path + 'training_info.txt', 'w') as file:
-        file.write(f'参与训练的收拾序号为{cf.gesture}')
-        file.write(f'数据集划分方式为{cf.tvt_select_mode}')
-        file.write(f'训练时间: {training_time:.2f} minutes\n')
-        file.write(f'训练数据选择数量: {cf.train_num} \n')
-        file.write(f'测试数据位置: {cf.test_nums} \n')
-        file.write(f'验证数据位置: {cf.val_nums}\n')
-        file.write(f'训练数据位置: {cf.train_nums}\n')
-        file.write(f'测试数据选择数量: {cf.test_num} \n')
-        file.write(f'验证数据选择数量: {cf.val_num} \n')
-        file.write(f'窗口大小: {cf.window_size}\n')
-        file.write(f'窗口步长: {cf.step_size}\n')
-        file.write(f'小窗口大小: {cf.step_size_little}\n')
-        file.write(f'小窗口步长: {cf.window_size_little}\n')
-        file.write(f'训练次数: {cf.epochs}\n')
-        file.write(f'缩放系数: {cf.scaling}\n')
-        file.write(f'所调用的模型: {cf.model_name}\n')
 
-    print(f"Total training time: {training_time:.2f} minutes")
-
-    print("训练完成！")
-
-    print(f"训练历史记录已保存到: {history_file_path}")
-
-    test_loss, test_accuracy = cf.model.evaluate(test_dataset, verbose=2)
-
-    print(f'\nTest accuracy: {test_accuracy * 100:.2f}%')
-
-    print(f'\nTest loss: {test_loss:.4f}')
 

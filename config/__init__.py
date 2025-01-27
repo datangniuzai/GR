@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # @Time : 2024/11/14 19:28
-# @Author : 李 嘉 轩
+# @Author : Jiaxuan LI
 # @File : __init__.py.py
 # @Software: PyCharm
 
@@ -17,7 +17,7 @@ collector_number    = None        # 采集器编号
 
 feature_shape       = None        # 输入特征形状
 training_info_path  = None        # 模型等信息保存地址
-
+train_info_csv_path = None        # 训练过程数据保存地址
 data_path           = None        # 文件夹地址
 
 tvt_select_mode     = None        # 数据集选择方式

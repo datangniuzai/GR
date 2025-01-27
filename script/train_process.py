@@ -18,34 +18,21 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score, confusion_matrix, recall_score
 
 import config as cf
-from dataset import load_tfrecord_to_tensor,load_tfrecord_to_list
+from dataset import load_tfrecord_to_list,load_tfrecord_data_adjacency_label
 
 
-class ModelCallback(tf.keras.callbacks.Callback):
-    def __init__(self, model_save_path, save_weights_only=False, save_best_only=False, verbose=1):
+class SaveModelPathCallback(tf.keras.callbacks.Callback):
+    def __init__(self,model_save_path):
         super().__init__()
         self.model_save_path = model_save_path
-        self.save_weights_only = save_weights_only
-        self.save_best_only = save_best_only
-        self.verbose = verbose
-        self.best_loss = float('inf') if save_best_only else None
 
     def on_epoch_end(self, epoch, logs=None):
 
-        # The loss is training loss.
-        current_loss = logs.get("loss")
+        model_path = self.model_save_path.format(epoch=epoch + 1)
 
-        if not self.save_best_only or (current_loss is not None and current_loss < self.best_loss):
-            model_path = self.model_save_path.format(epoch=epoch + 1)
-            if self.verbose:
-                print(f"Model saved at: {model_path}")
+        cf.model_path = model_path
 
-            if self.save_best_only:
-                self.best_loss = current_loss
-
-            self.model.save(model_path, overwrite=True, save_format="tf", save_weights_only=self.save_weights_only)
-
-            cf.model_path = model_path
+        print(f"Model saved at: {model_path}")
 
 def make_train_folder():
 
@@ -81,15 +68,17 @@ def model_train():
     val_dataset = tf.data.Dataset.from_tensor_slices(((adjacency_val,x_val),y_val)).batch(16)
 
     model_save_path = cf.training_info_path + f'save_model/model_' + '{epoch:02d}.keras'
-    model_callback = ModelCallback(
-        model_save_path=model_save_path,
+    save_model_path_callback=SaveModelPathCallback(model_save_path)
+    model_checkpoint = tf.keras.callbacks.ModelCheckpoint(
+        filepath=model_save_path,
         save_weights_only=False,
         save_best_only=False,
         verbose=1
     )
 
     cf.history = cf.model.fit(train_dataset, validation_data=val_dataset, epochs=cf.epochs,
-                        callbacks=[model_callback])
+                        callbacks=[model_checkpoint,save_model_path_callback])
+
     save_train_history()
 
 def save_train_history():
@@ -108,10 +97,8 @@ def plot_confusion_matrix(training_info_path= None,model_path= None):
 
     data_test_path= cf.data_path + "processed_data/data_contact_test.tfrecord"
 
-    tensor_x_test, tensor_adjacency_test, tensor_y_test, *unused = load_tfrecord_to_tensor(data_test_path)
+    tensor_x_test, tensor_adjacency_test, tensor_y_test= load_tfrecord_data_adjacency_label(data_test_path)
 
-    print(f"Shape of tensor_adjacency_test: {tensor_adjacency_test.shape}")
-    print(f"Shape of tensor_x_test: {tensor_x_test.shape}")
     y_pred_prob = cf.model.predict([tensor_adjacency_test,tensor_x_test])
     y_pred = np.argmax(y_pred_prob, axis=1)
 

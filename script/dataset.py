@@ -416,15 +416,16 @@ def load_tfrecord_to_tensor(tfrecord_path: str) -> Tuple[tf.Tensor, tf.Tensor, t
         - time_preread_indices (tf.Tensor): Tensor containing time preread indices.
         - window_indices (tf.Tensor): Tensor containing window indices.
     """
+
     dataset = tf.data.TFRecordDataset(tfrecord_path)
 
     dataset = dataset.map(_parse_function)
 
     window_datas = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
     adjacencies = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
-    labels = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
-    time_preread_indices = tf.TensorArray(dtype=tf.int32, size=0, dynamic_size=True)
-    window_indices = tf.TensorArray(dtype=tf.int32, size=0, dynamic_size=True)
+    labels = tf.TensorArray(dtype=tf.uint8, size=0, dynamic_size=True)
+    time_preread_indices = tf.TensorArray(dtype=tf.uint8, size=0, dynamic_size=True)
+    window_indices = tf.TensorArray(dtype=tf.uint8, size=0, dynamic_size=True)
 
     for window_data, adjacency, label, time_preread_index, window_index in dataset:
         window_datas = window_datas.write(window_datas.size(), window_data)
@@ -441,7 +442,7 @@ def load_tfrecord_to_tensor(tfrecord_path: str) -> Tuple[tf.Tensor, tf.Tensor, t
 
     return window_datas, adjacencies, labels, time_preread_indices, window_indices
 
-def load_tfrecord_confusion_matrix(tfrecord_path: str) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
+def load_tfrecord_data_adjacency_label(tfrecord_path: str) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
     """
     Load the TFRecord file and return window data, adjacency matrix, and labels as Tensors.
 
@@ -472,6 +473,7 @@ def load_tfrecord_confusion_matrix(tfrecord_path: str) -> Tuple[tf.Tensor, tf.Te
     labels = labels.stack()
 
     return window_datas, adjacencies, labels
+
 # ------------------------------------- #
 #  Start--Database_create--main func    #
 # ------------------------------------- #

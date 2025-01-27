@@ -20,17 +20,31 @@ import config as cf
 from dataset import load_tfrecord_to_tensor,load_tfrecord_to_list
 
 
-class ModelPathCallback(tf.keras.callbacks.Callback):
-    def __init__(self,model_save_path):
+class ModelCallback(tf.keras.callbacks.Callback):
+    def __init__(self, model_save_path, save_weights_only=False, save_best_only=False, verbose=1):
         super().__init__()
         self.model_save_path = model_save_path
+        self.save_weights_only = save_weights_only
+        self.save_best_only = save_best_only
+        self.verbose = verbose
+        self.best_loss = float('inf') if save_best_only else None
 
     def on_epoch_end(self, epoch, logs=None):
-        model_path = self.model_save_path.format(epoch=epoch + 1)
 
-        cf.model_path = model_path
+        # The loss is training loss.
+        current_loss = logs.get("loss")
 
-        print(f"Model saved at: {model_path}")
+        if not self.save_best_only or (current_loss is not None and current_loss < self.best_loss):
+            model_path = self.model_save_path.format(epoch=epoch + 1)
+            if self.verbose:
+                print(f"Model saved at: {model_path}")
+
+            if self.save_best_only:
+                self.best_loss = current_loss
+
+            self.model.save(model_path, overwrite=True, save_format="tf", save_weights_only=self.save_weights_only)
+
+            cf.model_path = model_path
 
 def make_train_folder():
 
@@ -60,22 +74,21 @@ def model_train():
 
     print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))
 
-    x_val, adjacency_val,y_val, x_p , x_t = load_tfrecord_to_list(cf.data_path + "processed_data/data_contact_val.tfrecord")
-    x_train, adjacency_train,y_train, v_p , v_t = load_tfrecord_to_list(cf.data_path + "processed_data/data_contact_train.tfrecord")
+    x_val, adjacency_val, y_val, *unused = load_tfrecord_to_list(cf.data_path + "processed_data/data_contact_val.tfrecord")
+    x_train, adjacency_train, y_train, *unused = load_tfrecord_to_list(cf.data_path + "processed_data/data_contact_train.tfrecord")
     train_dataset = tf.data.Dataset.from_tensor_slices(((adjacency_train,x_train),y_train)).shuffle(len(x_train)).batch(32)
     val_dataset = tf.data.Dataset.from_tensor_slices(((adjacency_val,x_val),y_val)).batch(16)
 
     model_save_path = cf.training_info_path + f'save_model/model_' + '{epoch:02d}.keras'
-    model_path_callback = ModelPathCallback(model_save_path)
-    model_checkpoint = tf.keras.callbacks.ModelCheckpoint(
-        filepath=model_save_path,
+    model_callback = ModelCallback(
+        model_save_path=model_save_path,
         save_weights_only=False,
         save_best_only=False,
         verbose=1
     )
 
     cf.history = cf.model.fit(train_dataset, validation_data=val_dataset, epochs=cf.epochs,
-                        callbacks=[model_checkpoint, model_path_callback])
+                        callbacks=[model_callback])
 
 def plot_confusion_matrix(training_info_path= None,model_path= None):
 

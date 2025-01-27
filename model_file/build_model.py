@@ -4,7 +4,7 @@ import config as cf
 def creat_model():
     adjacency = tf.keras.Input(shape=(64,64), dtype=tf.float32,name='input_1')
     features_cnn = tf.keras.Input(shape=cf.feature_shape, name='input_2')
-    gclstm_1 = GATGRU(6,48,[6,1],[8])
+    gclstm_1 = GATGRU(5,48,[6,1],[8])
     gcn_1= gclstm_1(adjacency,features_cnn,None,last_layer=True)
     flatten_1 = tf.keras.layers.Flatten(name='flatten_1')(gcn_1)
     dense1 = tf.keras.layers.Dense(units=128, activation='relu',kernel_regularizer=tf.keras.regularizers.l2(0.001), name='dense_last')(flatten_1)

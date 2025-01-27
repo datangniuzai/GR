@@ -17,7 +17,7 @@
     "window_size_little": 100,
     "step_size_little": 50,
     "scaling": 200,
-    "feature_shape": [3,64,6],
+    "feature_shape": [7,64,5],
     "specify_data_set_mode": {
       "train_nums": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,12],
       "val_nums": [13,14,15,16],
@@ -30,7 +30,7 @@
     }
   },
   "model_train_parameters": {
-    "epochs": 25,
+    "epochs": 5,
     "model_name": "reGAU"
   }
 }

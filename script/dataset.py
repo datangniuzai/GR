@@ -419,11 +419,17 @@ def load_tfrecord_to_tensor(tfrecord_path: str) -> Tuple[
     window_indices: List[tf.Tensor] = []
 
     for window_data, adjacency, label, time_preread_index, window_index in dataset:
-        window_datas.append(window_data)
-        adjacencies.append(adjacency)
-        labels.append(label)
-        time_preread_indices.append(time_preread_index)
-        window_indices.append(window_index)
+        window_datas.append(window_data.numpy())
+        adjacencies.append(adjacency.numpy())
+        labels.append(label.numpy())
+        time_preread_indices.append(time_preread_index.numpy())
+        window_indices.append(window_index.numpy())
+
+    window_datas = tf.convert_to_tensor(window_datas)
+    adjacencies = tf.convert_to_tensor(adjacencies)
+    labels = tf.convert_to_tensor(labels)
+    time_preread_indices = tf.convert_to_tensor(time_preread_indices)
+    window_indices = tf.convert_to_tensor(window_indices)
 
     return window_datas, adjacencies, labels, time_preread_indices, window_indices
 

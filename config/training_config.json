@@ -30,7 +30,7 @@
     }
   },
   "model_train_parameters": {
-    "epochs": 5,
+    "epochs": 1,
     "model_name": "reGAU"
   }
 }

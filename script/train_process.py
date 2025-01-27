@@ -56,7 +56,7 @@ def make_train_folder():
 
 def model_train():
 
-    make_train_dir()
+    make_train_folder()
 
     print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))
 
@@ -67,7 +67,12 @@ def model_train():
 
     model_save_path = cf.training_info_path + f'save_model/model_' + '{epoch:02d}.keras'
     model_path_callback = ModelPathCallback(model_save_path)
-    model_checkpoint = tf.keras.callbacks.ModelCheckpoint(save_weights_only=False, save_best_only=False, verbose=1)
+    model_checkpoint = tf.keras.callbacks.ModelCheckpoint(
+        filepath=model_save_path,
+        save_weights_only=False,
+        save_best_only=False,
+        verbose=1
+    )
 
     cf.history = cf.model.fit(train_dataset, validation_data=val_dataset, epochs=cf.epochs,
                         callbacks=[model_checkpoint, model_path_callback])
@@ -77,14 +82,16 @@ def plot_confusion_matrix(training_info_path= None,model_path= None):
     if training_info_path is not None:
         cf.training_info_path = training_info_path + "/"
     if model_path is not None:
-        model_path = model_path
+        cf.model_path = model_path
 
-    cf.model.load_weights(model_path)
+    cf.model.load_weights(cf.model_path)
 
     data_test_path= cf.data_path + "processed_data/data_contact_test.tfrecord"
 
     tensor_x_test, tensor_adjacency_test, tensor_y_test, *unused = load_tfrecord_to_tensor(data_test_path)
 
+    print(f"Shape of tensor_adjacency_test: {tensor_adjacency_test.shape}")
+    print(f"Shape of tensor_x_test: {tensor_x_test.shape}")
     y_pred_prob = cf.model.predict([tensor_adjacency_test,tensor_x_test])
     y_pred = np.argmax(y_pred_prob, axis=1)
 

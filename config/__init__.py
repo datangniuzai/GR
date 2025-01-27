@@ -52,6 +52,7 @@ start_time          = None        # 数据集开始整理的时间
 end_time            = None        # 模型训练结束整理的时间
 
 model               = None        # 模型
+model_path          = None        # 模型地址
 model_name          = None        # 模型名称
 history             = None        # 训练历史
 

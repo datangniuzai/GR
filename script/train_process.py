@@ -20,7 +20,19 @@ import config as cf
 from dataset import load_tfrecord_to_tensor,load_tfrecord_to_list
 
 
-def model_train():
+class ModelPathCallback(tf.keras.callbacks.Callback):
+    def __init__(self,model_save_path):
+        super().__init__()
+        self.model_save_path = model_save_path
+
+    def on_epoch_end(self, epoch, logs=None):
+        model_path = self.model_save_path.format(epoch=epoch + 1)
+
+        cf.model_path = model_path
+
+        print(f"Model saved at: {model_path}")
+
+def make_train_folder():
 
     current_time = datetime.datetime.now()
     folder_name = current_time.strftime("%Y-%m-%d_%H-%M-%S")
@@ -42,18 +54,23 @@ def model_train():
 
     cf.training_info_path = cf.data_path + folder_name + "/"
 
-    print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))
+def model_train():
 
-    model_checkpoint = tf.keras.callbacks.ModelCheckpoint(
-        cf.training_info_path + f'save_model/model_' + '{epoch:02d}.keras',
-        save_weights_only=False, save_best_only=False, verbose=1)
+    make_train_dir()
+
+    print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))
 
     x_val, adjacency_val,y_val, x_p , x_t = load_tfrecord_to_list(cf.data_path + "processed_data/data_contact_val.tfrecord")
     x_train, adjacency_train,y_train, v_p , v_t = load_tfrecord_to_list(cf.data_path + "processed_data/data_contact_train.tfrecord")
     train_dataset = tf.data.Dataset.from_tensor_slices(((adjacency_train,x_train),y_train)).shuffle(len(x_train)).batch(32)
     val_dataset = tf.data.Dataset.from_tensor_slices(((adjacency_val,x_val),y_val)).batch(16)
+
+    model_save_path = cf.training_info_path + f'save_model/model_' + '{epoch:02d}.keras'
+    model_path_callback = ModelPathCallback(model_save_path)
+    model_checkpoint = tf.keras.callbacks.ModelCheckpoint(save_weights_only=False, save_best_only=False, verbose=1)
+
     cf.history = cf.model.fit(train_dataset, validation_data=val_dataset, epochs=cf.epochs,
-                        callbacks=[model_checkpoint])
+                        callbacks=[model_checkpoint, model_path_callback])
 
 def plot_confusion_matrix(training_info_path= None,model_path= None):
 

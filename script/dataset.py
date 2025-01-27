@@ -6,14 +6,15 @@
 # @Software: PyCharm
 
 import os
+from typing import Any, List, Tuple, Dict
 
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from typing import Any, List, Tuple, Dict
 
 import config as cf
 from filtering import bandpass_and_notch_filter
+
 
 # ------------------------------ #
 # Reset Adjacency Functionality  #
@@ -365,20 +366,23 @@ def load_tfrecord_to_dataset(tfrecord_path: str) -> tf.data.Dataset:
 
     return dataset
 
-def load_tfrecord_to_list(tfrecord_path: str) -> Tuple[
-    List[np.ndarray], List[np.ndarray], List[int], List[int], List[int]]:
+def load_tfrecord_to_list(tfrecord_path: str) -> Tuple[List[np.ndarray], List[np.ndarray], List[int], List[int], List[int]]:
     """
-    Load the TFRecord file and return some lists.
+    Load the TFRecord file and return the data as lists.
 
     Parameters:
     tfrecord_path (str): Path to the TFRecord file.
 
     Returns:
-    tuple: A tuple containing window data, adjacency matrix, labels, time preread indices, and window indices as lists.
+    Tuple[List[np.ndarray], List[np.ndarray], List[int], List[int], List[int]]:
+        A tuple containing:
+        - window_datas (List[np.ndarray]): List of window data arrays.
+        - adjacencies (List[np.ndarray]): List of adjacency matrix arrays.
+        - labels (List[int]): List of label integers.
+        - time_preread_indices (List[int]): List of time preread indices as integers.
+        - window_indices (List[int]): List of window indices as integers.
     """
-
     dataset = tf.data.TFRecordDataset(tfrecord_path)
-
     dataset = dataset.map(_parse_function)
 
     window_datas: List[np.ndarray] = []
@@ -398,15 +402,20 @@ def load_tfrecord_to_list(tfrecord_path: str) -> Tuple[
 
 def load_tfrecord_to_tensor(tfrecord_path: str) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
     """
-    Load the TFRecord file and return a dataset with Tensors directly.
+    Load the TFRecord file and return window data, adjacency matrix, labels,
+    time preread indices, and window indices as Tensors.
 
     Parameters:
     tfrecord_path (str): Path to the TFRecord file.
 
     Returns:
-    tuple: A tuple containing window data, adjacency matrix, labels, time preread indices, and window indices as Tensors.
+    Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]: A tuple containing:
+        - window_datas (tf.Tensor): Tensor containing window data.
+        - adjacencies (tf.Tensor): Tensor containing adjacency matrices.
+        - labels (tf.Tensor): Tensor containing labels.
+        - time_preread_indices (tf.Tensor): Tensor containing time preread indices.
+        - window_indices (tf.Tensor): Tensor containing window indices.
     """
-
     dataset = tf.data.TFRecordDataset(tfrecord_path)
 
     dataset = dataset.map(_parse_function)
@@ -432,36 +441,37 @@ def load_tfrecord_to_tensor(tfrecord_path: str) -> Tuple[tf.Tensor, tf.Tensor, t
 
     return window_datas, adjacencies, labels, time_preread_indices, window_indices
 
-def load_tfrecord_confusion_matrix(tfrecord_path: str) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor,]:
+def load_tfrecord_confusion_matrix(tfrecord_path: str) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
     """
-    Load the TFRecord file and return a dataset with Tensors directly.
+    Load the TFRecord file and return window data, adjacency matrix, and labels as Tensors.
 
     Parameters:
     tfrecord_path (str): Path to the TFRecord file.
 
     Returns:
-    tuple: A tuple containing window data, adjacency matrix, labels as Tensors.
+    Tuple[tf.Tensor, tf.Tensor, tf.Tensor]: A tuple containing:
+        - window_datas (tf.Tensor): Tensor containing window data.
+        - adjacencies (tf.Tensor): Tensor containing adjacency matrices.
+        - labels (tf.Tensor): Tensor containing labels.
     """
-
     dataset = tf.data.TFRecordDataset(tfrecord_path)
 
     dataset = dataset.map(_parse_function)
 
     window_datas = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
     adjacencies = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
-    labels = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
+    labels = tf.TensorArray(dtype=tf.uint8, size=0, dynamic_size=True)
 
     for window_data, adjacency, label, *unused in dataset:
         window_datas = window_datas.write(window_datas.size(), window_data)
         adjacencies = adjacencies.write(adjacencies.size(), adjacency)
         labels = labels.write(labels.size(), label)
 
-    window_datas = tf.convert_to_tensor(window_datas)
-    adjacencies = tf.convert_to_tensor(adjacencies)
-    labels = tf.convert_to_tensor(labels)
+    window_datas = window_datas.stack()
+    adjacencies = adjacencies.stack()
+    labels = labels.stack()
 
     return window_datas, adjacencies, labels
-
 # ------------------------------------- #
 #  Start--Database_create--main func    #
 # ------------------------------------- #

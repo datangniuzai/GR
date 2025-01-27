@@ -5,19 +5,20 @@
 # @File : train_process.py
 # @Software: PyCharm
 
-import os
 import csv
 import datetime
+import os
 import warnings
 
+import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import tensorflow as tf
-import matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score, confusion_matrix, recall_score
 
 import config as cf
-from dataset import load_tfrecord_to_list
+from dataset import load_tfrecord_to_tensor,load_tfrecord_to_list
+
 
 def model_train():
 
@@ -54,25 +55,29 @@ def model_train():
     cf.history = cf.model.fit(train_dataset, validation_data=val_dataset, epochs=cf.epochs,
                         callbacks=[model_checkpoint])
 
-def Plot_matrix():
-    cf.training_info_path = "2024.12.21/2024-12-25_14-21-06/"
-    model_path = cf.training_info_path+"save_model/model_17.keras"
-    x_test,adjacency_test, y_test,x_p,x_t = load_tfrecord_to_list(cf.data_path + "processed_data/data_contact_test.tfrecord")
-    x_test_tensor = tf.convert_to_tensor(x_test, dtype=tf.float32)
-    adjacency_test_tensor = tf.convert_to_tensor(adjacency_test,dtype=tf.float32)
+def plot_confusion_matrix(training_info_path= None,model_path= None):
+
+    if training_info_path is not None:
+        cf.training_info_path = training_info_path + "/"
+    if model_path is not None:
+        model_path = model_path
+
     cf.model.load_weights(model_path)
 
-    y_pred_prob = cf.model.predict([adjacency_test_tensor,x_test_tensor])
+    data_test_path= cf.data_path + "processed_data/data_contact_test.tfrecord"
+
+    tensor_x_test, tensor_adjacency_test, tensor_y_test, *unused = load_tfrecord_to_tensor(data_test_path)
+
+    y_pred_prob = cf.model.predict([tensor_adjacency_test,tensor_x_test])
     y_pred = np.argmax(y_pred_prob, axis=1)
 
-    accuracy = accuracy_score(y_test, y_pred)
-
-    cm = confusion_matrix(y_test, y_pred)
+    accuracy = accuracy_score(tensor_y_test, y_pred)
+    cm = confusion_matrix(tensor_y_test, y_pred)
     cm_sum = np.sum(cm, axis=1, keepdims=True)
     cm_perc = cm / cm_sum.astype(float) * 100
+
     plt.figure(figsize=(10, 8))
-    sns.heatmap(cm_perc, annot=True, cmap="YlGnBu", fmt=".1f", linewidths=.5, square=True,
-                annot_kws={"fontsize": 12})
+    sns.heatmap(cm_perc, annot=True, cmap="YlGnBu", fmt=".1f", linewidths=.5, square=True,annot_kws={"fontsize": 12})
     plt.xlabel('Predicted label', fontsize=14)
     plt.ylabel('True label', fontsize=14)
     plt.title(f'Confusion Matrix (Accuracy: {accuracy * 100:.2f}%)', fontsize=16)

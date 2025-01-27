@@ -10,10 +10,11 @@ import datetime
 import os
 import warnings
 
-import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import seaborn as sns
 import tensorflow as tf
+import matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score, confusion_matrix, recall_score
 
 import config as cf
@@ -89,6 +90,12 @@ def model_train():
 
     cf.history = cf.model.fit(train_dataset, validation_data=val_dataset, epochs=cf.epochs,
                         callbacks=[model_callback])
+    save_train_history()
+
+def save_train_history():
+    history_df = pd.DataFrame(cf.history.history)
+    csv_file_path = "training_history.csv"
+    history_df.to_csv(csv_file_path, index=False)
 
 def plot_confusion_matrix(training_info_path= None,model_path= None):
 
@@ -120,7 +127,30 @@ def plot_confusion_matrix(training_info_path= None,model_path= None):
     plt.title(f'Confusion Matrix (Accuracy: {accuracy * 100:.2f}%)', fontsize=16)
     plt.show()
 
-def Plot_loos_acc_matrix_test():
+def plot_loss_acc():
+
+    plt.figure(figsize=(12, 4))
+    plt.subplot(1, 2, 1)
+    plt.plot(cf.history.history['accuracy'])
+    plt.plot(cf.history.history['val_accuracy'])
+    plt.title('Model Accuracy')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.legend(['Train', 'Validation'], loc='upper left')
+
+    plt.subplot(1, 2, 2)
+    plt.plot(cf.history.history['loss'])
+    plt.plot(cf.history.history['val_loss'])
+    plt.title('Model Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.legend(['Train', 'Validation'], loc='upper left')
+    plt.savefig(cf.training_info_path + f'picture/loss_acc.svg', format='svg')
+    plt.close()
+
+    history_file_path = os.path.join(cf.training_info_path, f'Training_Information/training_history.csv')
+
+def Plot_loos_acc_matrix_test(training_info_path= None):
     if not cf.training_info_path:
         warnings.warn("Warning: training_info_path is not set!")
 
@@ -230,7 +260,6 @@ def Plot_loos_acc_matrix_test():
 
 def Plot_loos_acc_matrix():
 
-    # acc and loss 曲线
     plt.figure(figsize=(12, 4))
     plt.subplot(1, 2, 1)
     plt.plot(cf.history.history['accuracy'])
@@ -252,12 +281,11 @@ def Plot_loos_acc_matrix():
 
     history_file_path = os.path.join(cf.training_info_path, f'Training_Information/training_history.csv')
 
-    x_test, y_test, time_preread_indices, window_indices = load_tfrecord_to_list(
+    x_test, adjacency_test, y_test, read_indices_test, window_indices_test = load_tfrecord_to_list(
         cf.data_path + "processed_data/data_contact_test.tfrecord")
     x_test_tensor = tf.convert_to_tensor(x_test, dtype=tf.float32)
     test_dataset = tf.data.Dataset.from_tensor_slices((x_test, y_test)).batch(32)
 
-    # Retrieve and sort all files starting with "model_" in the directory;
     model_files = [f for f in os.listdir(cf.training_info_path + 'save_model/') if
                    f.startswith(f'model_')]
 
@@ -313,8 +341,8 @@ def Plot_loos_acc_matrix():
 
             # 记录所有预测错误的点所在的窗口位置
             failure_indices = np.where(y_pred != y_test)[0]
-            failure_time_preread_indices = [time_preread_indices[i] for i in failure_indices]
-            failure_window_indices = [window_indices[i] for i in failure_indices]
+            failure_time_preread_indices = [read_indices_test[i] for i in failure_indices]
+            failure_window_indices = [window_indices_test[i] for i in failure_indices]
             failure_labels = [y_test[i] for i in failure_indices]
             failure_predicted_labels = [y_pred[i] for i in failure_indices]
             failure_file_path = os.path.join(cf.training_info_path,

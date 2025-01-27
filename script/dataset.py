@@ -368,7 +368,7 @@ def load_tfrecord_to_dataset(tfrecord_path: str) -> tf.data.Dataset:
 def load_tfrecord_to_list(tfrecord_path: str) -> Tuple[
     List[np.ndarray], List[np.ndarray], List[int], List[int], List[int]]:
     """
-    Load the TFRecord file and return a dataset.
+    Load the TFRecord file and return some lists.
 
     Parameters:
     tfrecord_path (str): Path to the TFRecord file.
@@ -393,6 +393,37 @@ def load_tfrecord_to_list(tfrecord_path: str) -> Tuple[
         labels.append(label.numpy())
         time_preread_indices.append(time_preread_index.numpy())
         window_indices.append(window_index.numpy())
+
+    return window_datas, adjacencies, labels, time_preread_indices, window_indices
+
+def load_tfrecord_to_tensor(tfrecord_path: str) -> Tuple[
+    List[tf.Tensor], List[tf.Tensor], List[tf.Tensor], List[tf.Tensor], List[tf.Tensor]]:
+    """
+    Load the TFRecord file and return a dataset with Tensors directly.
+
+    Parameters:
+    tfrecord_path (str): Path to the TFRecord file.
+
+    Returns:
+    tuple: A tuple containing window data, adjacency matrix, labels, time preread indices, and window indices as Tensors.
+    """
+
+    dataset = tf.data.TFRecordDataset(tfrecord_path)
+
+    dataset = dataset.map(_parse_function)
+
+    window_datas: List[tf.Tensor] = []
+    adjacencies: List[tf.Tensor] = []
+    labels: List[tf.Tensor] = []
+    time_preread_indices: List[tf.Tensor] = []
+    window_indices: List[tf.Tensor] = []
+
+    for window_data, adjacency, label, time_preread_index, window_index in dataset:
+        window_datas.append(window_data)
+        adjacencies.append(adjacency)
+        labels.append(label)
+        time_preread_indices.append(time_preread_index)
+        window_indices.append(window_index)
 
     return window_datas, adjacencies, labels, time_preread_indices, window_indices
 

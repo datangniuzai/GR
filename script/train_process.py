@@ -6,9 +6,7 @@
 # @Software: PyCharm
 
 import os
-import csv
 import datetime
-import warnings
 from typing import List
 
 import numpy as np
@@ -17,9 +15,10 @@ import seaborn as sns
 import tensorflow as tf
 import matplotlib.pyplot as plt
 from keras.callbacks import History
-from sklearn.metrics import accuracy_score, confusion_matrix, recall_score
+from sklearn.metrics import accuracy_score, confusion_matrix
 
 import config as cf
+from model_file import creat_model
 from dataset import load_tfrecord_to_list,load_tfrecord_data_adjacency_label
 
 
@@ -67,9 +66,6 @@ def make_train_folder() -> str:
 
     return os.path.join(cf.data_path, folder_name) + "/"
 
-def _call_all_models():
-    # todo[1]提供一个方法反复加载模型
-    pass
 def get_models_list(models_folder_path: str) -> List[str]:
     """
     Retrieve all file names from a specified folder.
@@ -143,9 +139,6 @@ def save_test_info():
     # todo[1]: 将测试集在所有模型上的正确率补充进csv文件
     # todo[2]: 将recall率添加入csv文件
     pass
-def save_test_confusion_matrix():
-    # todo[1]: 将测试集在所有模型上的混淆矩阵进行计算保存
-    pass
 
 # --------------- #
 #  Plot Functions #
@@ -208,20 +201,23 @@ def plot_loss_acc(training_info_csv_path: str = None, fig_save_path: str = None)
 
 def plot_confusion_matrix(data_test_path: str = None, model_path: str = None, fig_save_path: str = None) -> None:
 
-    if data_test_path is not None:
-        if not hasattr(cf, 'data_path') or cf.data_path is None:
+    if data_test_path is None:
+        if hasattr(cf, 'data_path') and cf.data_path is not None:
+            data_test_path = os.path.join(cf.data_path, "processed_data", "data_contact_test.tfrecord")
+        else:
             raise ValueError("The 'data_path' is not set.")
-        data_test_path = os.path.join(cf.data_path, "processed_data", "data_contact_test.tfrecord")
 
-    if model_path is not None:
-        if not hasattr(cf, 'model_path') or cf.model_path is None:
-            raise ValueError("The 'model_path' is not set.")
-        model_path = cf.model_path
+    if model_path is None:
+        if hasattr(cf, 'model_path') and cf.model_path is not None:
+            model_path = cf.model_path
+        else:
+            raise ValueError("The 'model_path' is not set in either the argument or the configuration.")
 
     if fig_save_path is None:
-        if not hasattr(cf, 'training_info_path') or cf.training_info_path is None:
+        if hasattr(cf, 'training_info_path') and cf.training_info_path is not None:
+            data_test_path = os.path.join(cf.training_info_path, "figures", "confusion_matrix_test.svg")
+        else:
             raise ValueError("The 'fig_save_path' is not set.")
-        data_test_path = os.path.join(cf.training_info_path,"figures","confusion_matrix_test.svg")
 
     cf.model.load_weights(model_path)
 
@@ -245,7 +241,7 @@ def plot_confusion_matrix(data_test_path: str = None, model_path: str = None, fi
                 annot[i, j] = ""
 
     plt.figure(figsize=(15, 12))
-    sns.heatmap(cm_perc, annot=annot, cmap="YlGnBu", fmt=".1f", linewidths=1, square=True,
+    sns.heatmap(cm_perc, annot=annot, cmap="YlGnBu", fmt="", linewidths=1, square=True,
                 annot_kws={"fontsize": 12})
     plt.xlabel('Predicted label', fontsize=14)
     plt.ylabel('True label', fontsize=14)
@@ -254,227 +250,6 @@ def plot_confusion_matrix(data_test_path: str = None, model_path: str = None, fi
 
     plt.savefig(fig_save_path, format='svg')
     plt.close()
-
-def Plot_loos_acc_matrix_test(training_info_path= None):
-    if not cf.training_info_path:
-        warnings.warn("Warning: training_info_path is not set!")
-
-    test_save_path = os.path.join(cf.training_info_path, "test")
-
-    current_time = datetime.datetime.now()
-    test_folder_name = current_time.strftime("%Y-%m-%d_%H-%M-%S")
-
-    history_info_save_path = os.path.join(test_save_path, test_folder_name)
-    os.makedirs(history_info_save_path, exist_ok=True)
-
-    history_file_path = os.path.join(history_info_save_path, f'training_history.csv')
-
-    x_test, adjacency_test,y_test, time_preread_indices, window_indices = load_tfrecord_to_list(
-        cf.data_path + "processed_data/data_contact_test.tfrecord")
-    x_test_tensor = tf.convert_to_tensor(x_test, dtype=tf.float32)
-    adjacency_test_tensor = tf.convert_to_tensor(adjacency_test,dtype=tf.float32)
-    print(adjacency_test_tensor.shape)
-    # Retrieve and sort all files starting with "model_" in the directory;
-    model_files = [f for f in os.listdir(cf.training_info_path + 'models/') if
-                   f.startswith(f'model_')]
-
-    # returns a sorted list of filenames.
-    model_files.sort()
-
-    picture_folder = os.path.join(history_info_save_path, 'picture')
-    if not os.path.exists(picture_folder):
-        os.makedirs(picture_folder)
-
-    with open(history_file_path, 'w', newline='') as f:
-        writer = csv.writer(f)
-
-        header = ['epoch', 'loss', 'accuracy', 'val_loss', 'val_accuracy', 'test_accuracy']
-        for i in range(cf.gesture_num):
-            header.append(f'recall_gesture_{i}')
-        writer.writerow(header)
-
-        for epoch, model in enumerate(model_files):
-
-            model_path = os.path.join(cf.training_info_path, 'models', model)
-
-            cf.model.load_weights(model_path)
-
-            y_pred_prob = cf.model.predict([adjacency_test_tensor,x_test_tensor])
-            y_pred = np.argmax(y_pred_prob, axis=1)
-
-            # calculate the accuracy
-            accuracy = accuracy_score(y_test, y_pred)
-
-            # calculate the recall
-            recall = recall_score(y_test, y_pred, average=None)
-
-            cm = confusion_matrix(y_test, y_pred)
-            cm_sum = np.sum(cm, axis=1, keepdims=True)
-            cm_perc = cm / cm_sum.astype(float) * 100
-
-            # Do not display all zeros in the confusion matrix as annotations.
-            annot = np.zeros_like(cm_perc, dtype=object)
-            for i in range(cm_perc.shape[0]):
-                for j in range(cm_perc.shape[1]):
-                    if cm_perc[i, j] != 0:
-                        annot[i, j] = f"{cm_perc[i, j]:.2f}"
-                    else:
-                        annot[i, j] = ""
-
-            plt.figure(figsize=(15, 12))
-            sns.heatmap(cm_perc, annot=annot, cmap="YlGnBu", fmt='', linewidths=1, square=True,
-                        annot_kws={"fontsize": 12})
-            plt.xlabel('Predicted label', fontsize=14)
-            plt.ylabel('True label', fontsize=14)
-            plt.title(f'Accuracy: {accuracy * 100:.2f}%', fontsize=16)
-
-            heatmap_path = os.path.join(picture_folder, f'confusion_matrix_{model}.svg')
-
-            plt.savefig(heatmap_path, format='svg')
-            plt.close()
-
-            # 记录所有预测错误的点所在的窗口位置
-            failure_indices = np.where(y_pred != y_test)[0]
-            failure_time_preread_indices = [time_preread_indices[i] for i in failure_indices]
-            failure_window_indices = [window_indices[i] for i in failure_indices]
-            failure_labels = [y_test[i] for i in failure_indices]
-            failure_predicted_labels = [y_pred[i] for i in failure_indices]
-
-            failure_file_path = os.path.join(history_info_save_path, f'failure_indices_{model}.csv')
-
-            with open(failure_file_path, 'w', newline='') as failure_file:
-                failure_writer = csv.writer(failure_file)
-                failure_writer.writerow(['window_index', 'time_preread_index', 'label', 'predicted_label'])
-
-                for window_index, time_preread_index, label, predicted_label in zip(failure_window_indices,
-                                                                                    failure_time_preread_indices,
-                                                                                    failure_labels,
-                                                                                    failure_predicted_labels):
-                    failure_writer.writerow([window_index, time_preread_index, label, predicted_label])
-
-            row = [
-                epoch + 1,
-                cf.history.history['loss'][epoch],
-                cf.history.history['accuracy'][epoch],
-                cf.history.history['val_loss'][epoch],
-                cf.history.history['val_accuracy'][epoch],
-                accuracy
-            ]
-            row.extend(recall)
-            writer.writerow(row)
-
-def Plot_loos_acc_matrix():
-
-    plt.figure(figsize=(12, 4))
-    plt.subplot(1, 2, 1)
-    plt.plot(cf.history.history['accuracy'])
-    plt.plot(cf.history.history['val_accuracy'])
-    plt.title('Model Accuracy')
-    plt.xlabel('Epoch')
-    plt.ylabel('Accuracy')
-    plt.legend(['Train', 'Validation'], loc='upper left')
-
-    plt.subplot(1, 2, 2)
-    plt.plot(cf.history.history['loss'])
-    plt.plot(cf.history.history['val_loss'])
-    plt.title('Model Loss')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.legend(['Train', 'Validation'], loc='upper left')
-    plt.savefig(cf.training_info_path + f'picture/loss_acc.svg', format='svg')
-    plt.close()
-
-    history_file_path = os.path.join(cf.training_info_path, f'training_information/training_history.csv')
-
-    x_test, adjacency_test, y_test, read_indices_test, window_indices_test = load_tfrecord_to_list(
-        cf.data_path + "processed_data/data_contact_test.tfrecord")
-    x_test_tensor = tf.convert_to_tensor(x_test, dtype=tf.float32)
-    test_dataset = tf.data.Dataset.from_tensor_slices((x_test, y_test)).batch(32)
-
-    model_files = [f for f in os.listdir(cf.training_info_path + 'models/') if
-                   f.startswith(f'model_')]
-
-    # returns a sorted list of filenames.
-    model_files.sort()
-
-    with open(history_file_path, 'w', newline='') as f:
-        writer = csv.writer(f)
-
-        header = ['epoch', 'loss', 'accuracy', 'val_loss', 'val_accuracy', 'test_accuracy']
-        for i in range(cf.gesture_num):
-            header.append(f'recall_gesture_{i}')
-        writer.writerow(header)
-
-        for epoch, model in enumerate(model_files):
-
-            model_path = os.path.join(cf.training_info_path, 'models', model)
-
-            cf.model.load_weights(model_path)
-
-            y_pred_prob = cf.model.predict(x_test_tensor)
-            y_pred = np.argmax(y_pred_prob, axis=1)
-
-            # calculate the accuracy
-            accuracy = accuracy_score(y_test, y_pred)
-
-            # calculate the recall
-            recall = recall_score(y_test, y_pred, average=None)
-
-            cm = confusion_matrix(y_test, y_pred)
-            cm_sum = np.sum(cm, axis=1, keepdims=True)
-            cm_perc = cm / cm_sum.astype(float) * 100
-
-            # Do not display all zeros in the confusion matrix as annotations.
-            annot = np.zeros_like(cm_perc, dtype=object)
-            for i in range(cm_perc.shape[0]):
-                for j in range(cm_perc.shape[1]):
-                    if cm_perc[i, j] != 0:
-                        annot[i, j] = f"{cm_perc[i, j]:.2f}"
-                    else:
-                        annot[i, j] = ""
-
-            plt.figure(figsize=(15, 12))
-            sns.heatmap(cm_perc, annot=annot, cmap="YlGnBu", fmt='', linewidths=1, square=True,
-                        annot_kws={"fontsize": 12})
-            plt.xlabel('Predicted label', fontsize=14)
-            plt.ylabel('True label', fontsize=14)
-            plt.title(f'Accuracy: {accuracy * 100:.2f}%', fontsize=16)
-
-            heatmap_path = os.path.join(cf.training_info_path, f'picture/confusion_matrix_{model}.svg')
-            plt.savefig(heatmap_path, format='svg')
-            plt.close()
-
-            # 记录所有预测错误的点所在的窗口位置
-            failure_indices = np.where(y_pred != y_test)[0]
-            failure_time_preread_indices = [read_indices_test[i] for i in failure_indices]
-            failure_window_indices = [window_indices_test[i] for i in failure_indices]
-            failure_labels = [y_test[i] for i in failure_indices]
-            failure_predicted_labels = [y_pred[i] for i in failure_indices]
-            failure_file_path = os.path.join(cf.training_info_path,
-                                             f'error_data_information/failure_indices_{model}.csv')
-
-            with open(failure_file_path, 'w', newline='') as failure_file:
-                failure_writer = csv.writer(failure_file)
-                failure_writer.writerow(['window_index', 'time_preread_index', 'label', 'predicted_label'])
-
-                for window_index, time_preread_index, label, predicted_label in zip(failure_window_indices,
-                                                                                    failure_time_preread_indices,
-                                                                                    failure_labels,
-                                                                                    failure_predicted_labels):
-                    failure_writer.writerow([window_index, time_preread_index, label, predicted_label])
-
-            row = [
-                epoch + 1,
-                cf.history.history['loss'][epoch],
-                cf.history.history['accuracy'][epoch],
-                cf.history.history['val_loss'][epoch],
-                cf.history.history['val_accuracy'][epoch],
-                accuracy
-            ]
-            row.extend(recall)
-            writer.writerow(row)
-
-    cf.model_name = cf.model.name
 
 # ---------------- #
 #  Train Functions #
@@ -504,3 +279,14 @@ def model_train():
                         callbacks=[model_checkpoint,save_model_path_callback])
 
     cf.training_info_csv_path = save_train_history(history)
+
+def test_all_models(models_folder_path: str,fig_save_path: str) -> None:
+
+    if cf.model is None:
+        cf.model = creat_model()
+
+    models_list = get_models_list(models_folder_path)
+
+    for model in models_list:
+        model_path = os.path.join(models_folder_path, model)
+        plot_confusion_matrix(model_path=model_path,fig_save_path=fig_save_path)

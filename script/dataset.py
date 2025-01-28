@@ -292,6 +292,8 @@ def tfrecord_connect():
 
         print(f"[{dataset_type}] data has been merged and saved at [{connect_tfrecord_save_path}]")
 
+    print("data connection over")
+
 def tfrecord_save(dataset :tf.data.Dataset,tfrecord_save_path:str):
     """
     Save the dataset as a TFRecord file.
@@ -498,6 +500,8 @@ def database_create():
         for dataset_type in ['train', 'val', 'test']:
             tfrecord_establish(df, gesture_number, dataset_type)
         print(f"Gesture {gesture_number} data processing completed.")
+
+    print("data creation over")
 
 # ------------------------------------- #
 #  Over--Database_create--main func     #

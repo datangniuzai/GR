@@ -89,11 +89,13 @@ def generate_unique_file_path(file_save_path: str, extension: str) -> str :
     base_filename = "confusion_matrix"
     extension = extension
     counter = 1
-    new_file_path = os.path.join(file_save_path, f"{base_filename}_{counter}{extension}")
+    file_name = f"{base_filename}_{counter}{extension}"
 
-    while new_file_path in existing_files:
-        new_file_path = os.path.join(file_save_path, f"{base_filename}_{counter}{extension}")
+    while file_name in existing_files:
         counter += 1
+        file_name = f"{base_filename}_{counter}{extension}"
+
+    new_file_path = os.path.join(file_save_path,file_name)
 
     return new_file_path
 
@@ -233,7 +235,7 @@ def plot_confusion_matrix(data_test_path: str = None, model_path: str = None, fi
             raise ValueError("The 'fig_save_path' is not set.")
 
     fig_save_path = generate_unique_file_path(file_save_path=fig_save_path, extension= ".svg")
-
+    print("fig_save_path:",fig_save_path)
     cf.model.load_weights(model_path)
 
     tensor_x_test, tensor_adjacency_test, tensor_y_test = load_tfrecord_data_adjacency_label(data_test_path)

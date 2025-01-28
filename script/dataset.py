@@ -157,7 +157,8 @@ def calc_td(data: np.ndarray) -> np.ndarray:
     :param data: Input data matrix with shape (num_channels, signal_length)
     :return: Extracted features with shape (num_windows, num_channels, 5)
     """
-    num_channels, signal_length = data.shape
+    signal_length, num_channels, = data.shape
+
     num_windows = (signal_length - cf.window_size_little) // cf.step_size_little + 1
 
     features = []
@@ -168,35 +169,34 @@ def calc_td(data: np.ndarray) -> np.ndarray:
 
         start = i * cf.step_size_little
         end = start + cf.window_size_little
-        windowed_data = data[:, start:end]
+        windowed_data = data[start:end, :]
 
         # Mean Absolute Value (MAV)
-        mav = np.mean(np.abs(windowed_data), axis=1)
+        mav = np.mean(np.abs(windowed_data), axis=0)
         # Root Mean Square (RMS)
-        rms = np.sqrt(np.mean(windowed_data ** 2, axis=1))
+        rms = np.sqrt(np.mean(windowed_data ** 2, axis=0))
         # Mean Squared Error (MSE)
-        mse = np.mean((windowed_data - np.mean(windowed_data, axis=1, keepdims=True)) ** 2, axis=1)
+        mse = np.mean((windowed_data - np.mean(windowed_data, axis=0, keepdims=True)) ** 2, axis=0)
         # Zero-crossings
-        zero_crossings = np.sum(np.diff(np.sign(windowed_data), axis=1) != 0, axis=1)
+        zero_crossings = np.sum(np.diff(np.sign(windowed_data), axis=0) != 0, axis=0)
         # Willison Amplitude (WAMP)
-        willison_amplitudes = np.sum(np.abs(np.diff(windowed_data, axis=1)) > willison_threshold, axis=1)
+        willison_amplitudes = np.sum(np.abs(np.diff(windowed_data, axis=0)) > willison_threshold, axis=0)
         # Stack the features together
         feature = np.array([mav, rms, mse, zero_crossings, willison_amplitudes])
 
-        features.append(feature.T)
+        features.append(feature)
 
     features = np.array(features)
-
     normalized_features = z_score_normalize_per_feature(features)
 
     return normalized_features
 
 def z_score_normalize_per_feature(features: np.ndarray) -> np.ndarray:
-    normalized_features = (features - np.mean(features, axis=(0, 1), keepdims=True)) / np.std(features, axis=(0, 1), keepdims=True)
+    normalized_features = (features - np.mean(features, axis=(0, 2), keepdims=True)) / np.std(features, axis=(0, 1), keepdims=True)
     return normalized_features
 
 def z_score_normalize_per_channel(features: np.ndarray) -> np.ndarray:
-    normalized_features = (features - np.mean(features, axis=(0, 2), keepdims=True)) / np.std(features, axis=(0, 2), keepdims=True)
+    normalized_features = (features - np.mean(features, axis=(0, 1), keepdims=True)) / np.std(features, axis=(0, 2), keepdims=True)
     return normalized_features
 
 def z_score_normalize_per_window(features: np.ndarray) -> np.ndarray:
@@ -204,13 +204,13 @@ def z_score_normalize_per_window(features: np.ndarray) -> np.ndarray:
     return normalized_features
 
 def min_max_normalize_per_feature(features: np.ndarray) -> np.ndarray:
-    features_min = np.min(features, axis=(0, 1), keepdims=True)
-    features_max = np.max(features, axis=(0, 1), keepdims=True)
+    features_min = np.min(features, axis=(0, 2), keepdims=True)
+    features_max = np.max(features, axis=(0, 2), keepdims=True)
     return (features - features_min) / (features_max - features_min)
 
 def min_max_normalize_per_channel(features: np.ndarray) -> np.ndarray:
-    features_min = np.min(features, axis=(0, 2), keepdims=True)
-    features_max = np.max(features, axis=(0, 2), keepdims=True)
+    features_min = np.min(features, axis=(0, 1), keepdims=True)
+    features_max = np.max(features, axis=(0, 1), keepdims=True)
     return (features - features_min) / (features_max - features_min)
 
 def min_max_normalize_per_window(features: np.ndarray) -> np.ndarray:
@@ -234,31 +234,31 @@ def tfrecord_establish(df: np.ndarray, gesture_number: int, dataset_type: str):
     :return: The element_spec of the dataset
     """
 
-    window_data_feature = []
-    window_data_label = []
-    window_data_time_preread_index = []
-    window_data_window_index = []
+    window_data_features = []
+    window_data_labels = []
+    window_data_time_preread_indexs = []
+    window_data_window_indexs = []
 
     for read_time in range(1, cf.turn_read_sum + 1):
         if read_time in getattr(cf, f"{dataset_type}_nums"):
-            single_acqui_data = df[:, (read_time - 1) * (cf.time_preread * cf.sample_rate):read_time * (
-                        cf.time_preread * cf.sample_rate)]
+            single_acqui_data = df[(read_time - 1) * (cf.time_preread * cf.sample_rate):read_time * (
+                        cf.time_preread * cf.sample_rate), :]
             single_acqui_data = bandpass_and_notch_filter(single_acqui_data)
-            for j in range(0, single_acqui_data.shape[1] - cf.window_size + 1, cf.step_size):
-                window_data = single_acqui_data[:, j:j + cf.window_size]
-                window_data_feature.append(calc_td(window_data))
-                window_data_label.append(gesture_number - 1)
-                window_data_time_preread_index.append(read_time)
-                window_data_window_index.append(j)
+            for j in range(0, single_acqui_data.shape[0] - cf.window_size + 1, cf.step_size):
+                window_data = single_acqui_data[j:j + cf.window_size, :]
+                window_data_features.append(calc_td(window_data))
+                window_data_labels.append(gesture_number - 1)
+                window_data_time_preread_indexs.append(read_time)
+                window_data_window_indexs.append(j)
 
-    graph_count = len(window_data_feature)
-    adjacency = reset_adj(graph_count)
+    graph_count = len(window_data_features)
+    adjacencies = reset_adj(graph_count)
 
-    window_data_feature_tensor = tf.convert_to_tensor(window_data_feature, dtype=tf.float32)
-    adjacency_tensor = tf.convert_to_tensor(adjacency, dtype=tf.float32)
-    label_tensor = tf.convert_to_tensor(window_data_label, dtype=tf.uint8)
-    time_preread_index_tensor = tf.convert_to_tensor(window_data_time_preread_index, dtype=tf.uint8)
-    window_index_tensor = tf.convert_to_tensor(window_data_window_index, dtype=tf.uint8)
+    window_data_feature_tensor = tf.convert_to_tensor(window_data_features, dtype=tf.float32)
+    adjacency_tensor = tf.convert_to_tensor(adjacencies, dtype=tf.float32)
+    label_tensor = tf.convert_to_tensor(window_data_labels, dtype=tf.uint8)
+    time_preread_index_tensor = tf.convert_to_tensor(window_data_time_preread_indexs, dtype=tf.uint8)
+    window_index_tensor = tf.convert_to_tensor(window_data_window_indexs, dtype=tf.uint8)
 
     dataset = tf.data.Dataset.from_tensor_slices(
         (window_data_feature_tensor, adjacency_tensor, label_tensor, time_preread_index_tensor, window_index_tensor))
@@ -269,7 +269,7 @@ def tfrecord_establish(df: np.ndarray, gesture_number: int, dataset_type: str):
     tfrecord_path = os.path.join(save_path, f"data_{gesture_number}_{dataset_type}.tfrecord")
     tfrecord_save(dataset, tfrecord_path)
 
-    cf.feature_shape = window_data_feature[1].shape
+    cf.feature_shape = window_data_features[1].shape
 
 def tfrecord_connect():
 
@@ -340,10 +340,8 @@ def _parse_function(proto: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, 
         'window_index': tf.io.FixedLenFeature([1], tf.int64)
     }
 
-    # Parse the example from the TFRecord
     data = tf.io.parse_single_example(proto, keys_to_features)
 
-    # Recast the types for 'label', 'time_preread_index', and 'window_index'
     data['label'] = tf.cast(data['label'], tf.uint8)
     data['time_preread_index'] = tf.cast(data['time_preread_index'], tf.uint8)
     data['window_index'] = tf.cast(data['window_index'], tf.uint8)
@@ -360,10 +358,9 @@ def load_tfrecord_to_dataset(tfrecord_path: str) -> tf.data.Dataset:
     Returns:
     tf.data.Dataset: A TensorFlow dataset containing window data, labels, time preread indices, and window indices.
     """
-    # Create the TFRecord dataset
+
     dataset = tf.data.TFRecordDataset(tfrecord_path)
 
-    # Parse the data using `_parse_function`
     dataset = dataset.map(_parse_function)
 
     return dataset
@@ -496,7 +493,7 @@ def database_create():
 
     for gesture_number in cf.gesture:
         path = cf.data_path + f'original_data/sEMG_data{gesture_number}.csv'
-        df = pd.read_csv(path, header=None).to_numpy().T
+        df = pd.read_csv(path, header=None).to_numpy()
         for dataset_type in ['train', 'val', 'test']:
             tfrecord_establish(df, gesture_number, dataset_type)
         print(f"Gesture {gesture_number} data processing completed.")

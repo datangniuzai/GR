@@ -1,12 +1,14 @@
-﻿import tensorflow as tf
+﻿import numpy as np
+import tensorflow as tf
 
 import config as cf
 from model_file.GAT_GRU import GatGru
 
 
 def creat_model():
-
-    _, count_channel, _ = cf.feature_shape
+    # todo Delete this code when the model dimension is adapted.
+    num_time_step, num_features, num_channels = cf.feature_shape
+    temp_feature_shape= [num_time_step, num_channels, num_features]
 
     gat_gru_layer = GatGru(
         in_channels= 5,
@@ -17,9 +19,9 @@ def creat_model():
         dropout_rate_out=0.3
     )
 
-    layer_input_adjacency = tf.keras.Input(shape=(count_channel,count_channel), dtype=tf.float32,name='layer_input_adjacency')
+    layer_input_adjacency = tf.keras.Input(shape=(cf.num_channels,cf.num_channels), dtype=tf.float32,name='layer_input_adjacency')
 
-    layer_input_graph = tf.keras.Input(shape=cf.feature_shape, name='layer_input_graph')
+    layer_input_graph = tf.keras.Input(shape=temp_feature_shape, name='layer_input_graph')
 
     layer_gat_gru= gat_gru_layer(layer_input_adjacency,layer_input_graph,None,last_layer=True)
 

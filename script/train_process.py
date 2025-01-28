@@ -215,6 +215,7 @@ def plot_loss_acc(training_info_csv_path: str = None, fig_save_path: str = None)
     plt.savefig(fig_save_path, format='svg')
     plt.close()
 
+
 def plot_confusion_matrix(data_test_path: str = None, model_path: str = None, fig_save_path: str = None) -> None:
     if data_test_path is None:
         if hasattr(cf, 'data_path') and cf.data_path is not None:
@@ -234,35 +235,68 @@ def plot_confusion_matrix(data_test_path: str = None, model_path: str = None, fi
         else:
             raise ValueError("The 'fig_save_path' is not set.")
 
-    fig_save_path = generate_unique_file_path(file_save_path=fig_save_path, extension= ".svg")
-    print("fig_save_path:",fig_save_path)
+    fig_save_path = generate_unique_file_path(file_save_path=fig_save_path, extension=".svg")
+    print("fig_save_path:", fig_save_path)
     cf.model.load_weights(model_path)
 
     tensor_x_test, tensor_adjacency_test, tensor_y_test = load_tfrecord_data_adjacency_label(data_test_path)
-
     y_pred_prob = cf.model.predict([tensor_adjacency_test, tensor_x_test])
     y_pred = np.argmax(y_pred_prob, axis=1)
 
     accuracy = accuracy_score(tensor_y_test, y_pred)
     cm = confusion_matrix(tensor_y_test, y_pred)
+
+    n_labels = cm.shape[0]
+    base_size = 1.5
+    max_fig_size = 20
+    min_fontsize = 12
+
+    fig_width = min(n_labels * base_size, max_fig_size)
+    fig_height = min(n_labels * base_size * 0.8, max_fig_size * 0.8)
+
+
+    annot_fontsize = max(min_fontsize, 14 - n_labels // 8)
+    axis_fontsize = max(min_fontsize + 8, 20 - n_labels // 6)
+    title_fontsize = axis_fontsize + 4
+
     cm_sum = np.sum(cm, axis=1, keepdims=True)
     cm_perc = cm / cm_sum.astype(float) * 100
 
     annot = np.zeros_like(cm_perc, dtype=object)
     for i in range(cm_perc.shape[0]):
         for j in range(cm_perc.shape[1]):
-            if cm_perc[i, j] != 0:
-                annot[i, j] = f"{cm_perc[i, j]:.2f}"
-            else:
-                annot[i, j] = ""
+            annot[i, j] = f"{cm_perc[i, j]:.2f}" if cm_perc[i, j] != 0 else ""
 
-    plt.figure(figsize=(15, 12))
-    sns.heatmap(cm_perc, annot=annot, cmap="YlGnBu", fmt="", linewidths=1, square=True, annot_kws={"fontsize": 12})
-    plt.xlabel('Predicted label', fontsize=14)
-    plt.ylabel('True label', fontsize=14)
-    plt.title(f'Accuracy: {accuracy * 100:.2f}%', fontsize=16)
+    plt.figure(figsize=(fig_width, fig_height))
+    heatmap = sns.heatmap(
+        cm_perc,
+        annot=annot,
+        cmap="YlGnBu",
+        fmt="",
+        linewidths=1.5,
+        linecolor="black",
+        square=True,
+        annot_kws={
+            "fontsize": annot_fontsize,
+        },
+        cbar_kws={
+            "shrink": 0.8,
+            "orientation": "vertical",
+        }
+    )
 
-    plt.savefig(fig_save_path, format='svg')
+    cbar = heatmap.collections[0].colorbar
+    cbar.ax.tick_params(labelsize=axis_fontsize - 2)
+
+    plt.xlabel('Predicted label', fontsize=axis_fontsize, fontweight="bold")
+    plt.ylabel('True label', fontsize=axis_fontsize, fontweight="bold")
+    plt.title(f'Accuracy: {accuracy * 100:.2f}%', fontsize=title_fontsize, fontweight="bold")
+
+    plt.xticks(fontsize=axis_fontsize - 2, fontweight="bold")
+    plt.yticks(fontsize=axis_fontsize - 2, fontweight="bold")
+
+    plt.tight_layout()
+    plt.savefig(fig_save_path, format='svg', bbox_inches='tight')
     plt.close()
 
 # ---------------- #
@@ -290,7 +324,7 @@ def model_train():
     )
 
     history = cf.model.fit(train_dataset, validation_data=val_dataset, epochs=cf.epochs,
-                        callbacks=[model_checkpoint,save_model_path_callback])
+                           callbacks=[model_checkpoint,save_model_path_callback])
 
     cf.training_info_csv_path = save_train_history(history)
     models_folder_path = os.path.join(cf.training_info_path, "models")

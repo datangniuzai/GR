@@ -1,5 +1,4 @@
 ﻿import tensorflow as tf
-import numpy as np
 
 
 class GAT(tf.keras.layers.Layer):

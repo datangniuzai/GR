@@ -5,18 +5,19 @@
     "collector_number": 1,
     "gesture_read_count_per_instance": 20,
     "read_duration_per_instance": 4,
-    "gesture_sequence":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26],
+    "gesture_read_sequence":[1,2,3],
     "action_rest_duration": 12,
     "gesture_rest_duration":60
   },
   "data_process_parameters": {
-    "data_path": "250114-W-Man-S-26",
+    "data_path": "data/250114-W-Man-S-26",
+    "gesture_train_sequence":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26],
     "window_size": 400,
     "step_size": 100,
-    "window_size_little": 100,
-    "step_size_little": 50,
+    "window_size_little": 200,
+    "step_size_little": 100,
     "scaling": 200,
-    "feature_shape": [3,64,6],
+    "feature_shape": [3,64,5],
     "specify_data_set_mode": {
       "train_nums": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,12],
       "val_nums": [13,14,15,16],
@@ -29,7 +30,7 @@
     }
   },
   "model_train_parameters": {
-    "epochs": 25,
+    "epochs": 10,
     "model_name": "reGAU"
   }
 }

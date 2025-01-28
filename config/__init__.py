@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # @Time : 2024/11/14 19:28
-# @Author : 李 嘉 轩
+# @Author : Jiaxuan LI
 # @File : __init__.py.py
 # @Software: PyCharm
 
@@ -17,7 +17,7 @@ collector_number    = None        # 采集器编号
 
 feature_shape       = None        # 输入特征形状
 training_info_path  = None        # 模型等信息保存地址
-
+train_info_csv_path = None        # 训练过程数据保存地址
 data_path           = None        # 文件夹地址
 
 tvt_select_mode     = None        # 数据集选择方式
@@ -52,6 +52,7 @@ start_time          = None        # 数据集开始整理的时间
 end_time            = None        # 模型训练结束整理的时间
 
 model               = None        # 模型
+model_path          = None        # 模型地址
 model_name          = None        # 模型名称
 history             = None        # 训练历史
 
@@ -75,15 +76,15 @@ def pattern_set():
             print("⚠️ 输入无效！请输入'1'或'2'以选择使用模式。\n")
 
 def config_read():
+
     global gesture_num, gesture, turn_read_sum, time_preread , data_path ,collector_number
 
     global action_rest, gesture_rest
 
-    # read model and training info
     with open('config/training_config.json', 'r', encoding='utf-8') as f:
         config = json.load(f)
 
-    set_pattern =pattern_set()
+    set_pattern = pattern_set()
 
     if set_pattern == '1':
 
@@ -97,7 +98,7 @@ def config_read():
         action_rest = drp["action_rest_duration"]
         gesture_rest = drp["gesture_rest_duration"]
 
-        gesture = drp["gesture_sequence"]
+        gesture = drp["gesture_read_sequence"]
         gesture_num = len(gesture)
 
         data_folder_create()
@@ -129,6 +130,10 @@ def config_read():
         scaling = dpp['scaling']
 
         feature_shape = dpp['feature_shape']
+
+        gesture = dpp['gesture_train_sequence']
+        gesture_num = len(gesture)
+
         # model train parameters
         mtp = config['model_train_parameters']
 
@@ -143,9 +148,6 @@ def config_read():
         identifier = info['identifier']
 
         experiment_info = info['experiment_info']
-
-        gesture = experiment_info['gesture_sequence']
-        gesture_num = len(gesture)
 
         turn_read_sum = experiment_info['gesture_read_count_per_instance']
         time_preread = experiment_info['read_duration_per_instance']

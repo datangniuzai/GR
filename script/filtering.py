@@ -8,17 +8,18 @@
 import numpy as np
 import pandas as pd
 from scipy import signal
+
 import config as cf
 
 # Global definition of filter coefficients
 
 # Bandpass filter (25Hz - 350Hz)
+
 SOS_BANDPASS = signal.butter(16, [25, 350], analog=False, btype='band', output='sos', fs=cf.sample_rate)
 
 # Notch filter coefficients (50Hz, 100Hz, 150Hz, 200Hz, 250Hz)
-NOTCH_FILTERS = [
-    signal.iirnotch(freq, 50, cf.sample_rate) for freq in [50, 100, 150, 200, 250]
-]
+
+NOTCH_FILTERS = [signal.iirnotch(freq, 50, cf.sample_rate) for freq in [50, 100, 150, 200, 250]]
 
 def bandpass_and_notch_filter(data: np.ndarray) -> np.ndarray:
     """

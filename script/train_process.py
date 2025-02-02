@@ -52,14 +52,12 @@ def make_train_folder() -> str:
     main_folder_path = os.path.join(cf.data_path, folder_name)
     os.makedirs(main_folder_path, exist_ok=True)
 
-    picture_folder_path = os.path.join(main_folder_path, "picture")
     model_folder_path = os.path.join(main_folder_path, "models")
     test_information = os.path.join(main_folder_path, "test_information")
     training_information = os.path.join(main_folder_path, "training_information")
     test_folder_path = os.path.join(main_folder_path, "test")
     figures_folder_path = os.path.join(main_folder_path, "figures")
 
-    os.makedirs(picture_folder_path, exist_ok=True)
     os.makedirs(model_folder_path, exist_ok=True)
     os.makedirs(test_information, exist_ok=True)
     os.makedirs(training_information, exist_ok=True)
@@ -219,7 +217,7 @@ def save_test_info_to_csv(
     model_list = [f for f in os.listdir(models_folder_path) if f.endswith('.keras')]
 
     # Header for the CSV file with dynamic recall labels based on gesture numbers
-    header = ['model_name', 'accuracy'] + [f'recall_gesture_{i + 1}' for i in range(cf.gesture_num)]
+    header = ['epoch', 'accuracy'] + [f'recall_gesture_{i + 1}' for i in range(cf.gesture_num)]
 
     # Write the header row to the CSV file
     with open(test_info_csv_path, 'w', newline='') as f:

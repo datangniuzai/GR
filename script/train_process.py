@@ -6,20 +6,22 @@
 # @Software: PyCharm
 
 import os
+import csv
+import re
+from typing import Optional, List
 import datetime
-from typing import List
 
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import tensorflow as tf
 import matplotlib.pyplot as plt
+import tensorflow as tf
 from keras.callbacks import History
-from sklearn.metrics import accuracy_score, confusion_matrix
+from sklearn.metrics import accuracy_score, confusion_matrix, recall_score
 
 import config as cf
+from dataset import load_tfrecord_to_list, load_tfrecord_data_label
 from model_file import tccnn_model_creat
-from dataset import load_tfrecord_to_list,load_tfrecord_data_label
 
 
 class SaveModelPathCallback(tf.keras.callbacks.Callback):
@@ -37,7 +39,7 @@ class SaveModelPathCallback(tf.keras.callbacks.Callback):
 
 def make_train_folder() -> str:
     """
-    Creates a training folder structure with subdirectories for saving pictures, models, error data,
+    Creates a training folder structure with subdirectories for saving pictures, models, test_information,
     training information, test data, and figures. The folder is named with the current date and time.
 
     Returns:
@@ -52,14 +54,14 @@ def make_train_folder() -> str:
 
     picture_folder_path = os.path.join(main_folder_path, "picture")
     model_folder_path = os.path.join(main_folder_path, "models")
-    error_data_information = os.path.join(main_folder_path, "error_data_information")
+    test_information = os.path.join(main_folder_path, "test_information")
     training_information = os.path.join(main_folder_path, "training_information")
     test_folder_path = os.path.join(main_folder_path, "test")
     figures_folder_path = os.path.join(main_folder_path, "figures")
 
     os.makedirs(picture_folder_path, exist_ok=True)
     os.makedirs(model_folder_path, exist_ok=True)
-    os.makedirs(error_data_information, exist_ok=True)
+    os.makedirs(test_information, exist_ok=True)
     os.makedirs(training_information, exist_ok=True)
     os.makedirs(test_folder_path, exist_ok=True)
     os.makedirs(figures_folder_path, exist_ok=True)
@@ -83,10 +85,9 @@ def get_models_list(models_folder_path: str) -> List[str]:
         print(f"Error: No permission to access folder '{models_folder_path}'.")
         return []
 
-def generate_unique_file_path(file_save_path: str, extension: str) -> str :
+def generate_unique_file_path(base_filename: str,file_save_path: str, extension: str) -> str :
 
     existing_files = os.listdir(file_save_path)
-    base_filename = "confusion_matrix"
     extension = extension
     counter = 1
     file_name = f"{base_filename}_{counter}{extension}"
@@ -151,10 +152,112 @@ def save_train_config() -> None:
     print("Training completed!")
     print(f"Saved training info to: {path_save_training_config}\n")
 
-def save_test_info():
-    # todo[1]: 将测试集在所有模型上的正确率补充进csv文件
-    # todo[2]: 将recall率添加入csv文件
-    pass
+def save_test_info_to_csv(
+        data_test_path: Optional[str] = None,
+        models_folder_path: Optional[str] = None,
+        test_info_csv_path: Optional[str] = None
+) -> None:
+    """
+    Save test information (accuracy and recall) of models to a CSV file.
+
+    Parameters:
+    data_test_path (str, optional): Path to the test data TFRecord file.
+    models_folder_path (str, optional): Path to the folder containing model files (.keras).
+    test_info_csv_path (str, optional): Path to the output CSV file.
+
+    Returns:
+    None: This function does not return any value.
+    It directly saves the test information to the specified CSV file.
+
+    Example:
+    save_test_info_to_csv(
+        data_test_path="/path/to/test_data.tfrecord",
+        models_folder_path="/path/to/models_folder",
+        test_info_csv_path="/path/to/test_info.csv"
+    )
+    """
+    cf.model = tccnn_model_creat()
+    # Generate the path to save the CSV file if not provided
+    if test_info_csv_path is None:
+        if hasattr(cf, 'test_info_csv_path') and cf.test_info_csv_path is not None:
+            test_info_csv_path = os.path.join(cf.training_info_path, "test_information", "test_info.csv")
+        else:
+            raise ValueError("The 'test_info_csv_path' is not set.")
+
+    # Check if the CSV file already exists, if so, ask the user for confirmation to delete it
+    if os.path.exists(test_info_csv_path):
+        while True:
+            user_input = input(f"The file '{test_info_csv_path}' already exists. Do you want to delete it? (y/n): ")
+            if user_input.lower() == 'y':
+                os.remove(test_info_csv_path)
+                print(f"Deleted existing file: {test_info_csv_path}")
+                break
+            elif user_input.lower() == 'n':
+                print("File was not deleted.")
+                break
+            else:
+                print("Invalid input. Please enter 'y' to delete or 'n' to cancel.")
+
+    # Generate the path to the test data if not provided
+    if data_test_path is None:
+        if hasattr(cf, 'data_path') and cf.data_path is not None:
+            data_test_path = os.path.join(cf.data_path, "processed_data", "data_contact_test.tfrecord")
+        else:
+            raise ValueError("The 'data_path' is not set.")
+
+    # Generate the path to the model folder if not provided
+    if models_folder_path is None:
+        if hasattr(cf, 'training_info_path') and cf.training_info_path is not None:
+            models_folder_path = os.path.join(cf.training_info_path, "models")
+        else:
+            raise ValueError("The 'model_folder_path' is not set in either the argument or the configuration.")
+
+    # Load the test data (input features and labels)
+    tensor_x_test, tensor_y_test = load_tfrecord_data_label(data_test_path)
+
+    # List all the model files with the .keras extension in the specified models folder
+    model_list = [f for f in os.listdir(models_folder_path) if f.endswith('.keras')]
+
+    # Header for the CSV file with dynamic recall labels based on gesture numbers
+    header = ['model_name', 'accuracy'] + [f'recall_gesture_{i + 1}' for i in range(cf.gesture_num)]
+
+    # Write the header row to the CSV file
+    with open(test_info_csv_path, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
+
+    # Loop through each model file and evaluate its performance
+    for model in model_list:
+        # Extract the model number from the filename using regular expression
+        match = re.search(r'_(\d+)\.keras', model)
+
+        if match:
+            model_number = match.group(1)
+        else:
+            raise ValueError(f"Model name '{model}' does not match the expected format '_<number>.keras'.")
+
+        model_path = os.path.join(models_folder_path, model)
+
+        # Load the model weights
+        cf.model.load_weights(model_path)
+
+        # Make predictions on the test data
+        y_pred_prob = cf.model.predict([tensor_x_test])
+
+        # Convert predicted probabilities to class labels
+        y_pred = np.argmax(y_pred_prob, axis=1)
+
+        # Calculate accuracy and recall scores
+        accuracy = accuracy_score(tensor_y_test, y_pred)
+        recall = recall_score(tensor_y_test, y_pred, average=None)
+
+        # Write the test results for the model to the CSV file
+        row = [model_number, accuracy] + list(recall)
+        with open(test_info_csv_path, 'a', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(row)
+
+    print(f"Test information saved to '{test_info_csv_path}'.")
 
 # --------------- #
 #  Plot Functions #
@@ -234,8 +337,14 @@ def plot_confusion_matrix(data_test_path: str = None, model_path: str = None, fi
         else:
             raise ValueError("The 'fig_save_path' is not set.")
 
-    fig_save_path = generate_unique_file_path(file_save_path=fig_save_path, extension= ".svg")
+    fig_save_path = generate_unique_file_path(
+        base_filename="confusion_matrix",
+        file_save_path=fig_save_path,
+        extension= ".svg"
+    )
+
     print("fig_save_path:",fig_save_path)
+
     cf.model.load_weights(model_path)
 
     tensor_x_test, tensor_y_test = load_tfrecord_data_label(data_test_path)

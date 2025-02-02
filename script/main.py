@@ -10,7 +10,7 @@ os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 
 import config as cf
 from model_file import tccnn_model_creat
-from train_process import model_train,plot_confusion_matrix
+from train_process import model_train,plot_confusion_matrix,save_test_info_to_csv
 from dataset import database_create,tfrecord_connect
 
 if __name__ == '__main__':

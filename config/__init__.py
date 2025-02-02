@@ -15,10 +15,11 @@ num_channels        = 64          # 通道数
 sample_rate         = 2000        # 采样率
 collector_number    = None        # 采集器编号
 
-feature_shape       = None        # 输入特征形状
-training_info_path  = None        # 模型等信息保存地址
-train_info_csv_path = None        # 训练过程数据保存地址
 data_path           = None        # 文件夹地址
+feature_shape       = None        # 输入特征形状
+training_info_path  = None        # 本次训练所生成的目录
+train_info_csv_path = None        # 训练过程数据保存地址
+test_info_csv_path  = None        # 测试集验证细节
 
 tvt_select_mode     = None        # 数据集选择方式
 
@@ -55,7 +56,6 @@ model               = None        # 模型
 model_path          = None        # 模型地址
 model_name          = None        # 模型名称
 history             = None        # 训练历史
-
 
 def get_data_set_model():
     global tvt_select_mode

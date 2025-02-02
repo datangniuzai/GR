@@ -9,8 +9,8 @@ import time
 os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 
 import config as cf
-from model_file import creat_model
-from train_process import model_train
+from model_file import tccnn_model_creat
+from train_process import model_train,plot_confusion_matrix
 from dataset import database_create,tfrecord_connect
 
 if __name__ == '__main__':
@@ -18,6 +18,6 @@ if __name__ == '__main__':
     cf.start_time = time.time()
     database_create()
     tfrecord_connect()
-    cf.model = creat_model()
+    cf.model = tccnn_model_creat()
     model_train()
     cf.end_time = time.time()

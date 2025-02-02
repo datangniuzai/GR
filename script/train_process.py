@@ -18,8 +18,8 @@ from keras.callbacks import History
 from sklearn.metrics import accuracy_score, confusion_matrix
 
 import config as cf
-from model_file import creat_model
-from dataset import load_tfrecord_to_list,load_tfrecord_data_adjacency_label
+from model_file import tccnn_model_creat
+from dataset import load_tfrecord_to_list,load_tfrecord_data_label
 
 
 class SaveModelPathCallback(tf.keras.callbacks.Callback):
@@ -238,11 +238,9 @@ def plot_confusion_matrix(data_test_path: str = None, model_path: str = None, fi
     print("fig_save_path:",fig_save_path)
     cf.model.load_weights(model_path)
 
-    tensor_x_test, tensor_adjacency_test, tensor_y_test = load_tfrecord_data_adjacency_label(data_test_path)
+    tensor_x_test, tensor_y_test = load_tfrecord_data_label(data_test_path)
 
-    tensor_x_test = trans_dim(tensor_x_test)
-
-    y_pred_prob = cf.model.predict([tensor_adjacency_test, tensor_x_test])
+    y_pred_prob = cf.model.predict([tensor_x_test])
     y_pred = np.argmax(y_pred_prob, axis=1)
 
     accuracy = accuracy_score(tensor_y_test, y_pred)
@@ -271,24 +269,18 @@ def plot_confusion_matrix(data_test_path: str = None, model_path: str = None, fi
 #  Train Functions #
 # ---------------- #
 
-# todo Delete this code when the model dimension is adapted.
-def trans_dim(data):
-    return data.swapaxes(1, 2)
-
 def model_train():
 
     cf.training_info_path = make_train_folder()
 
     print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))
 
-    x_val, adjacency_val, y_val, *unused = load_tfrecord_to_list(cf.data_path + "processed_data/data_contact_val.tfrecord")
-    x_train, adjacency_train, y_train, *unused = load_tfrecord_to_list(cf.data_path + "processed_data/data_contact_train.tfrecord")
+    x_val, y_val, *unused = load_tfrecord_to_list(cf.data_path + "processed_data/data_contact_val.tfrecord")
+    x_train, y_train, *unused = load_tfrecord_to_list(cf.data_path + "processed_data/data_contact_train.tfrecord")
 
-    x_val = trans_dim(x_val)
-    x_train = x_train(x_val)
 
-    train_dataset = tf.data.Dataset.from_tensor_slices(((adjacency_train,x_train),y_train)).shuffle(len(x_train)).batch(32)
-    val_dataset = tf.data.Dataset.from_tensor_slices(((adjacency_val,x_val),y_val)).batch(16)
+    train_dataset = tf.data.Dataset.from_tensor_slices((x_train,y_train)).shuffle(len(x_train)).batch(32)
+    val_dataset = tf.data.Dataset.from_tensor_slices((x_val,y_val)).batch(16)
 
     model_save_path = cf.training_info_path + f'models/model_' + '{epoch:02d}.keras'
     save_model_path_callback=SaveModelPathCallback(model_save_path)
@@ -310,7 +302,7 @@ def model_train():
 def test_all_models(models_folder_path: str,fig_save_path: str) -> None:
 
     if cf.model is None:
-        cf.model = creat_model()
+        cf.model = tccnn_model_creat()
 
     models_list = get_models_list(models_folder_path)
 

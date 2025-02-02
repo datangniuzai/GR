@@ -16,57 +16,72 @@ import numpy as np
 
 import config as cf
 
-def sEMG_data_read_save():
 
+def sEMG_data_read_save():
+    """
+    Collect and save sEMG data by receiving UDP packets.
+
+    Instructions:
+    1. Configure parameters in the `cf` module (collector_number, gesture, etc.).
+    2. Run the function to start data collection.
+    3. Ensure the UDP socket is properly configured with the correct IP and port.
+
+    Returns:
+    None
+    """
     engine = pyttsx3.init()
     rate = engine.getProperty('rate')
-    engine.setProperty('rate', rate + 50)  # 修改数字以调整语速，数字越大语速越快
-    # 选择不同的声音（如果可用）
+    engine.setProperty('rate', rate + 50)  # Increase speech rate
     # voices = engine.getProperty('voices')
-    # engine.setProperty('voice', voices[1].id)  # 选择第二个声音（索引从0开始）
+    # engine.setProperty('voice', voices[1].id)
 
     udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     udp_socket.bind(('192.168.1.100', cf.collector_number))
+
+    reallocated_data_size = (cf.time_preread + 1) * cf.sample_rate
+    output_data = np.zeros((reallocated_data_size, 64), dtype=np.float32)
+
     start_time = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
     try:
-        output_data = np.empty((0, 64), dtype=np.float32)
         i = 1
-        while i < (cf.turn_read_sum+1):
+        while i < (cf.turn_read_sum + 1):
             for gesture_number in cf.gesture:
-                text_to_speak = str(f"请做好{gesture_number}号手势,采集开始")
+
+                text_to_speak = f"Please prepare for gesture {gesture_number}, collection starting."
                 print(text_to_speak)
                 engine.say(text_to_speak)
                 engine.runAndWait()
                 time.sleep(0.5)
-                print("开始采集")
-                turn = True
-                while turn:
+                print("Collecting data...")
+
+                collected_samples = 0
+                while collected_samples < reallocated_data_size:
                     data, addr = udp_socket.recvfrom(1300)
-                    reshaped_data = np.reshape(np.array(struct.unpack('<640h', data[18:1298])), (10, 64))
-                    output_data = np.concatenate((output_data, reshaped_data), axis=0)
-                    if output_data.shape[0] == (cf.time_preread + 1) * cf.sample_rate:
-                        with open(cf.data_path + f'original_data/sEMG_data{gesture_number}.csv', 'a') as f:
-                            np.savetxt(f, output_data[cf.sample_rate:, :] * 0.195, delimiter=',', fmt='%.6f')
-                        turn = False
-                        output_data = np.empty((0, 64), dtype=np.float32)
-                time.sleep(0.5)
-                text_to_speak = str(f"请休息")
+                    reshaped_data = np.frombuffer(data[18:1298], dtype='<i2').reshape(10, 64)
+                    output_data[collected_samples:collected_samples + 10, :] = reshaped_data
+                    collected_samples += 10
+
+                # Save data to file
+                with open(cf.data_path + f'original_data/sEMG_data{gesture_number}.csv', 'a') as f:
+                    np.savetxt(f, output_data[cf.sample_rate:, :] * 0.195, delimiter=',', fmt='%.6f')
+
+                text_to_speak = "Please rest."
                 print(text_to_speak)
                 engine.say(text_to_speak)
                 engine.runAndWait()
                 time.sleep(15)
+
             i += 1
             time.sleep(180)
 
     finally:
-
         end_time = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
 
-        generate_volunteer_experiment_info(start_time,end_time)
+        generate_volunteer_experiment_info(start_time, end_time)
 
         udp_socket.close()
 
-        print(f"❤️Please rename the folder [{cf.data_path}] to identifier "
+        print(f"\u2764Please rename the folder [{cf.data_path}] to identifier "
               "and complete the details of the [vol_exp_info.json].")
 
 def generate_volunteer_experiment_info(start_time,end_time):

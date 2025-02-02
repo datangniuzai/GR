@@ -1,1 +1,1 @@
-﻿from .build_model import creat_model
+﻿from .build_model import tccnn_model_creat

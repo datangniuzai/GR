@@ -5,10 +5,11 @@
 # @File : __init__.py.py
 # @Software: PyCharm
 
-import os
 import datetime
 import json
+import os
 import random
+from typing import List, Tuple
 
 # configs
 num_channels        = 64          # 通道数
@@ -49,8 +50,8 @@ epochs              = None        # 网络循环次数
 
 scaling             = None        # 数据缩放系数
 
-start_time          = None        # 数据集开始整理的时间
-end_time            = None        # 模型训练结束整理的时间
+start_train_time    = None        # 模型训练开始的时间
+end_train_time      = None        # 模型训练结束的时间
 
 model               = None        # 模型
 model_path          = None        # 模型地址
@@ -165,16 +166,7 @@ def config_read():
                 raise ValueError(f"调用{train_num + val_num + test_num}次所采集数据，但总采集次数仅有{turn_read_sum}次！")
 
             else:
-                all_numbers = list(range(1, turn_read_sum + 1))
-                train_nums = random.sample(all_numbers, train_num)
-
-                remaining_numbers = [num for num in all_numbers if num not in train_nums]
-                test_nums = random.sample(remaining_numbers, test_num)
-
-                remaining_numbers = [num for num in remaining_numbers if num not in test_nums]
-                val_nums = random.sample(remaining_numbers, val_num)
-
-                remaining_numbers = [num for num in remaining_numbers if num not in val_nums]
+                train_nums,test_nums,val_nums, remaining_numbers= split_data(turn_read_sum, train_num, test_num, val_num)
 
         else:
             # special
@@ -219,13 +211,47 @@ def data_folder_create():
     os.makedirs(os.path.join(folder_name, 'processed_data'))
     os.makedirs(os.path.join(folder_name, 'original_data'))
     os.makedirs(os.path.join(folder_name, 'picture'))
-    os.makedirs(os.path.join(folder_name, 'train_info'))
+    os.makedirs(os.path.join(folder_name, 'all_train_info'))
+
 
     folder_path = os.path.abspath(folder_name)
 
     print(f"创建了数据集的文件夹，所在位置为： {folder_path}")
     folder_basename = os.path.basename(folder_path)
     data_path = folder_basename + "/"
+
+def split_data(_turn_read_sum: int, _train_num: int, _test_num: int, _val_num: int) \
+        -> Tuple[List[int], List[int], List[int], List[int]]:
+    """
+    Split the dataset into training, testing, validation sets and return any remaining numbers.
+
+    Parameters:
+    - turn_read_sum: The total number of samples in the dataset (int).
+    - train_num: The number of samples in the training set (int).
+    - test_num: The number of samples in the testing set (int).
+    - val_num: The number of samples in the validation set (int).
+
+    Returns:
+    - A tuple of four lists:
+      - train_nums: A list of sample indices for the training set (List[int]).
+      - test_nums: A list of sample indices for the testing set (List[int]).
+      - val_nums: A list of sample indices for the validation set (List[int]).
+      - remaining_nums: A list of remaining sample indices (List[int]).
+    """
+    all_numbers = list(range(1, _turn_read_sum + 1))  # List of all sample indices
+
+    _train_nums = random.sample(all_numbers, _train_num)
+
+    _remaining_numbers = [num for num in all_numbers if num not in _train_nums]
+    _test_nums = random.sample(_remaining_numbers, _test_num)
+
+
+    _remaining_numbers = [num for num in _remaining_numbers if num not in _test_nums]
+    _val_nums = random.sample(_remaining_numbers, _val_num)
+    _remaining_numbers = [num for num in _remaining_numbers if num not in _val_nums]
+
+    return _train_nums, _test_nums, _val_nums, _remaining_numbers
+
 
 if __name__ == '__main__':
     config_read()

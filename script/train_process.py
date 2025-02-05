@@ -8,8 +8,9 @@
 import os
 import csv
 import re
-from typing import Optional, List
+import time
 import datetime
+from typing import Optional, List
 
 import numpy as np
 import pandas as pd
@@ -20,8 +21,9 @@ from keras.callbacks import History
 from sklearn.metrics import accuracy_score, confusion_matrix, recall_score
 
 import config as cf
-from dataset import load_tfrecord_to_list, load_tfrecord_data_label
-from model_file import tccnn_model_creat
+from config import split_data
+from dataset import load_tfrecord_to_list, load_tfrecord_data_label,database_create,tfrecord_connect
+from model_file import tccnn_model_creat, cnn_mode_creat, bilstm_model_creat, cnn_bilstm_model_creat
 
 
 class SaveModelPathCallback(tf.keras.callbacks.Callback):
@@ -37,7 +39,7 @@ class SaveModelPathCallback(tf.keras.callbacks.Callback):
 
         print(f"Model saved at: {model_path}")
 
-def make_train_folder() -> str:
+def make_train_folder(k: int = None, model_name: str = None) -> str:
     """
     Creates a training folder structure with subdirectories for saving pictures, models, test_information,
     training information, test data, and figures. The folder is named with the current date and time.
@@ -46,10 +48,15 @@ def make_train_folder() -> str:
     - str: The path of the main training folder created.
     """
 
-    current_time = datetime.datetime.now()
-    folder_name = current_time.strftime("%Y-%m-%d_%H-%M-%S")
+    folder_name = datetime.datetime.now().strftime("%m-%d_%H-%M")
 
-    main_folder_path = os.path.join(cf.data_path, folder_name)
+    if k:
+        folder_name = f"fold{k}_{folder_name}"
+
+    if model_name:
+        folder_name = f"{model_name}_{folder_name}"
+
+    main_folder_path = os.path.join(cf.data_path,"all_train_info",folder_name)
     os.makedirs(main_folder_path, exist_ok=True)
 
     model_folder_path = os.path.join(main_folder_path, "models")
@@ -64,7 +71,7 @@ def make_train_folder() -> str:
     os.makedirs(test_folder_path, exist_ok=True)
     os.makedirs(figures_folder_path, exist_ok=True)
 
-    return os.path.join(cf.data_path, folder_name) + "/"
+    return main_folder_path + "/"
 
 def get_models_list(models_folder_path: str) -> List[str]:
     """
@@ -123,30 +130,31 @@ def save_train_config() -> None:
     The file will be named "training_info.txt".
     """
 
-    training_time = (cf.end_time - cf.start_time) / 60
+    train_duration_seconds = cf.end_train_time - cf.start_train_time
+    train_duration_minutes = train_duration_seconds / 60
 
-    path_save_training_config = os.path.join(cf.training_info_path, f'training_information/training_info.txt')
+    path_save_training_config = os.path.join(cf.training_info_path, f'training_information/training_config.txt')
     os.makedirs(os.path.dirname(path_save_training_config), exist_ok=True)
 
     with open(path_save_training_config, 'w') as file:
         file.write(f'Gesture numbers: {cf.gesture}\n')
         file.write(f'Dataset mode: {cf.tvt_select_mode}\n')
-        file.write(f'Training time: {training_time:.2f} minutes\n')
+        file.write(f'Training time: {train_duration_minutes:.2f} minutes\n')
         file.write(f'Training samples: {cf.train_num}\n')
+        file.write(f'Validation samples: {cf.val_num}\n')
+        file.write(f'Test samples: {cf.test_num}\n')
         file.write(f'Test data locations: {cf.test_nums}\n')
         file.write(f'Validation data locations: {cf.val_nums}\n')
         file.write(f'Training data locations: {cf.train_nums}\n')
-        file.write(f'Test samples: {cf.test_num}\n')
-        file.write(f'Validation samples: {cf.val_num}\n')
-        file.write(f'Window size: {cf.window_size}\n')
-        file.write(f'Window step size: {cf.step_size}\n')
-        file.write(f'Small window size: {cf.window_size_little}\n')
-        file.write(f'Small window step size: {cf.step_size_little}\n')
+        file.write(f'Primary window size: {cf.window_size}\n')
+        file.write(f'Primary window step size: {cf.step_size}\n')
+        file.write(f'Secondary  window size: {cf.window_size_little}\n')
+        file.write(f'Secondary  window step size: {cf.step_size_little}\n')
         file.write(f'Epochs: {cf.epochs}\n')
         file.write(f'Scaling factor: {cf.scaling}\n')
         file.write(f'Model: {cf.model_name}\n')
 
-    print(f"Total training time: {training_time:.2f} minutes")
+    print(f"Total training time: {train_duration_minutes:.2f} minutes")
     print("Training completed!")
     print(f"Saved training info to: {path_save_training_config}\n")
 
@@ -174,15 +182,15 @@ def save_test_info_to_csv(
         test_info_csv_path="/path/to/test_info.csv"
     )
     """
-    cf.model = tccnn_model_creat()
-    # Generate the path to save the CSV file if not provided
+    if cf.model is None:
+        raise ValueError("Model is not initialized. Please provide a valid model.")
+
     if test_info_csv_path is None:
-        if hasattr(cf, 'test_info_csv_path') and cf.test_info_csv_path is not None:
+        if hasattr(cf, 'training_info_path') and cf.training_info_path is not None:
             test_info_csv_path = os.path.join(cf.training_info_path, "test_information", "test_info.csv")
         else:
-            raise ValueError("The 'test_info_csv_path' is not set.")
+            raise ValueError("The 'training_info_path' is not set.")
 
-    # Check if the CSV file already exists, if so, ask the user for confirmation to delete it
     if os.path.exists(test_info_csv_path):
         while True:
             user_input = input(f"The file '{test_info_csv_path}' already exists. Do you want to delete it? (y/n): ")
@@ -196,37 +204,29 @@ def save_test_info_to_csv(
             else:
                 print("Invalid input. Please enter 'y' to delete or 'n' to cancel.")
 
-    # Generate the path to the test data if not provided
     if data_test_path is None:
         if hasattr(cf, 'data_path') and cf.data_path is not None:
             data_test_path = os.path.join(cf.data_path, "processed_data", "data_contact_test.tfrecord")
         else:
             raise ValueError("The 'data_path' is not set.")
 
-    # Generate the path to the model folder if not provided
     if models_folder_path is None:
         if hasattr(cf, 'training_info_path') and cf.training_info_path is not None:
             models_folder_path = os.path.join(cf.training_info_path, "models")
         else:
             raise ValueError("The 'model_folder_path' is not set in either the argument or the configuration.")
 
-    # Load the test data (input features and labels)
     tensor_x_test, tensor_y_test = load_tfrecord_data_label(data_test_path)
 
-    # List all the model files with the .keras extension in the specified models folder
     model_list = [f for f in os.listdir(models_folder_path) if f.endswith('.keras')]
 
-    # Header for the CSV file with dynamic recall labels based on gesture numbers
     header = ['epoch', 'accuracy'] + [f'recall_gesture_{i + 1}' for i in range(cf.gesture_num)]
 
-    # Write the header row to the CSV file
     with open(test_info_csv_path, 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(header)
 
-    # Loop through each model file and evaluate its performance
     for model in model_list:
-        # Extract the model number from the filename using regular expression
         match = re.search(r'_(\d+)\.keras', model)
 
         if match:
@@ -236,20 +236,15 @@ def save_test_info_to_csv(
 
         model_path = os.path.join(models_folder_path, model)
 
-        # Load the model weights
         cf.model.load_weights(model_path)
 
-        # Make predictions on the test data
         y_pred_prob = cf.model.predict([tensor_x_test])
 
-        # Convert predicted probabilities to class labels
         y_pred = np.argmax(y_pred_prob, axis=1)
 
-        # Calculate accuracy and recall scores
         accuracy = accuracy_score(tensor_y_test, y_pred)
         recall = recall_score(tensor_y_test, y_pred, average=None)
 
-        # Write the test results for the model to the CSV file
         row = [model_number, accuracy] + list(recall)
         with open(test_info_csv_path, 'a', newline='') as f:
             writer = csv.writer(f)
@@ -376,15 +371,15 @@ def plot_confusion_matrix(data_test_path: str = None, model_path: str = None, fi
 #  Train Functions #
 # ---------------- #
 
-def model_train():
+def one_model_train():
 
-    cf.training_info_path = make_train_folder()
+    if cf.training_info_path is None:
+        raise ValueError("The 'training_info_path' is not set.")
 
     print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))
 
     x_val, y_val, *unused = load_tfrecord_to_list(cf.data_path + "processed_data/data_contact_val.tfrecord")
     x_train, y_train, *unused = load_tfrecord_to_list(cf.data_path + "processed_data/data_contact_train.tfrecord")
-
 
     train_dataset = tf.data.Dataset.from_tensor_slices((x_train,y_train)).shuffle(len(x_train)).batch(32)
     val_dataset = tf.data.Dataset.from_tensor_slices((x_val,y_val)).batch(16)
@@ -397,19 +392,48 @@ def model_train():
         save_best_only=False,
         verbose=1
     )
+    cf.start_train_time = time.time()
 
     history = cf.model.fit(train_dataset, validation_data=val_dataset, epochs=cf.epochs,
                         callbacks=[model_checkpoint,save_model_path_callback])
 
+    cf.end_train_time = time.time()
+
     cf.training_info_csv_path = save_train_history(history)
-    models_folder_path = os.path.join(cf.training_info_path, "models")
-    fig_save_path = os.path.join(cf.training_info_path, "figures")
-    test_all_models(models_folder_path, fig_save_path)
 
-def test_all_models(models_folder_path: str,fig_save_path: str) -> None:
+    save_train_config()
 
-    if cf.model is None:
-        cf.model = tccnn_model_creat()
+    all_models_confusion_matrix(cf.training_info_path)
+
+    save_test_info_to_csv()
+
+def k_fold_cross_validation(k):
+    model_list = ["tccnn", "cnn", "bilstm", "cnn-bilstm"]
+
+    model_function_map = {
+        "bilstm": bilstm_model_creat,
+        "cnn-bilstm": cnn_bilstm_model_creat,
+        "tccnn": tccnn_model_creat,
+        "cnn": cnn_mode_creat,
+    }
+    for k_step in range(1,k+1):
+        cf.train_nums,cf.test_nums,cf.val_nums,_ = split_data(cf.turn_read_sum, cf.train_num, cf.test_num, cf.val_num)
+        # database_create()
+        # tfrecord_connect()
+        for model_name in model_list:
+            cf.training_info_path = make_train_folder(k=k_step,model_name=model_name)
+            model_function = model_function_map.get(model_name)
+            if model_function:
+                cf.model = model_function()
+                cf.training_info_path = make_train_folder(k_step, model_name)
+                one_model_train()
+            else:
+                print(f"Function for {model_name} not found.")
+
+def all_models_confusion_matrix(training_info_path) -> None:
+
+    models_folder_path = os.path.join(training_info_path, "models")
+    fig_save_path = os.path.join(training_info_path, "figures")
 
     models_list = get_models_list(models_folder_path)
 

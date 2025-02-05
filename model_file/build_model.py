@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # @Time : 2024/02/01 19:43
 # @Author : Jiaxuan LI
@@ -8,7 +8,9 @@
 from typing import Tuple
 
 import tensorflow as tf
-from tensorflow.keras.layers import Layer, Conv2D, BatchNormalization, Activation, Dropout, Input, Dense, Flatten
+from tensorflow.keras.layers import (
+    Layer, Conv2D, BatchNormalization, Activation, Dropout,
+    Input, Dense, Flatten, TimeDistributed, Conv1D, Bidirectional, LSTM)
 from tensorflow.keras.models import Model
 from tensorflow.keras.utils import register_keras_serializable
 
@@ -166,8 +168,6 @@ class TCCNNLayer(Layer):
         })
         return config
 
-
-
 def tccnn_model_creat():
 
     cf.model_name = "TCCNN"
@@ -187,6 +187,97 @@ def tccnn_model_creat():
 
     nadam_optimizer = tf.keras.optimizers.Nadam()
     model.compile(optimizer=nadam_optimizer, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    model.summary()
+
+    return model
+
+def cnn_mode_creat():
+    cf.model_name = "CNN"
+
+    input_layer = Input(shape=cf.feature_shape, name='input_layer')
+
+    reshape_layer = TimeDistributed(Flatten(), name='reshape_layer')(input_layer)
+
+    cnn1 = Conv1D(filters=10, kernel_size=4, activation='relu', name='cnn1')(reshape_layer)
+    cnn2 = Conv1D(filters=20, kernel_size=4, activation='relu', name='cnn2')(cnn1)
+
+    flatten1 = Flatten(name='flatten_1')(cnn2)
+
+    dense1 = tf.keras.layers.Dense(units=120, activation='relu', name='dense_last')(flatten1)
+
+    output_layer = Dense(units=cf.gesture_num, activation='softmax', name='output_layer_last')(dense1)
+
+    model = Model(inputs=input_layer, outputs=output_layer)
+
+    nadam_optimizer = tf.keras.optimizers.Nadam()
+
+    model.compile(optimizer=nadam_optimizer, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+
+    model.summary()
+
+    return model
+
+def bilstm_model_creat():
+
+    cf.model_name = "Bi-LSTM"
+
+    input_layer = Input(shape=cf.feature_shape, name='input_layer')
+
+    reshape_layer = TimeDistributed(Flatten(), name='reshape_layer')(input_layer)
+    bi_lstm1 = Bidirectional(
+        LSTM(units=32, return_sequences=True, dropout=0.35, recurrent_dropout=0.15, name='lstm_1'),
+        name='bidirectional_1')(reshape_layer)
+    bi_lstm2 = Bidirectional(
+        LSTM(units=128, return_sequences=True, dropout=0.3, recurrent_dropout=0.15, name='lstm_2'),
+        name='bidirectional_2')(bi_lstm1)
+    bi_lstm3 = Bidirectional(
+        LSTM(units=64, return_sequences=False, dropout=0.2, recurrent_dropout=0.15, name='lstm_3'),
+        name='bidirectional_3')(bi_lstm2)
+    flatten2 = Flatten(name='flatten_2')(bi_lstm3)
+
+    dense1 = tf.keras.layers.Dense(units=120, activation='relu', name='dense_last')(flatten2)
+
+    output_layer = Dense(units=cf.gesture_num, activation='softmax', name='output_layer_last')(dense1)
+    model = Model(inputs=input_layer, outputs=output_layer)
+
+    nadam_optimizer = tf.keras.optimizers.Nadam()
+    model.compile(optimizer=nadam_optimizer, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+
+    model.summary()
+
+def cnn_bilstm_model_creat():
+
+    cf.model_name = "CNN-BiLSTM"
+
+    input_layer = tf.keras.layers.Input(shape=cf.feature_shape, name='input_layer')
+
+    reshape_layer = tf.keras.layers.TimeDistributed(tf.keras.layers.Flatten(), name='reshape_layer')(input_layer)
+
+    cnn1 = tf.keras.layers.Conv1D(filters=10, kernel_size=4, activation='relu', name='cnn1')(reshape_layer)
+    cnn2 = tf.keras.layers.Conv1D(filters=20, kernel_size=4, activation='relu', name='cnn2')(cnn1)
+
+    bi_lstm1 = tf.keras.layers.Bidirectional(
+        tf.keras.layers.LSTM(units=32, return_sequences=True, dropout=0.35, recurrent_dropout=0.15, name='lstm_1'),
+        name='bidirectional_1')(cnn2)
+    bi_lstm2 = tf.keras.layers.Bidirectional(
+        tf.keras.layers.LSTM(units=128, return_sequences=True, dropout=0.3, recurrent_dropout=0.15, name='lstm_2'),
+        name='bidirectional_2')(bi_lstm1)
+    bi_lstm3 = tf.keras.layers.Bidirectional(
+        tf.keras.layers.LSTM(units=64, return_sequences=False, dropout=0.2, recurrent_dropout=0.15, name='lstm_3'),
+        name='bidirectional_3')(bi_lstm2)
+
+    flatten = tf.keras.layers.Flatten(name='flatten')(bi_lstm3)
+
+    dense1 = tf.keras.layers.Dense(units=120, activation='relu', name='dense_last')(flatten)
+
+    output_layer = tf.keras.layers.Dense(units=cf.gesture_num, activation='softmax', name='output_layer_last')(
+        dense1)
+
+    model = tf.keras.Model(inputs=input_layer, outputs=output_layer)
+
+    nadam_optimizer = tf.keras.optimizers.Nadam()
+    model.compile(optimizer=nadam_optimizer, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+
     model.summary()
 
     return model

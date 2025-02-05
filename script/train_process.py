@@ -418,8 +418,8 @@ def k_fold_cross_validation(k):
     }
     for k_step in range(1,k+1):
         cf.train_nums,cf.test_nums,cf.val_nums,_ = split_data(cf.turn_read_sum, cf.train_num, cf.test_num, cf.val_num)
-        # database_create()
-        # tfrecord_connect()
+        database_create()
+        tfrecord_connect()
         for model_name in model_list:
             cf.training_info_path = make_train_folder(k=k_step,model_name=model_name)
             model_function = model_function_map.get(model_name)

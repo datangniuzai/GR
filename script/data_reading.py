@@ -9,7 +9,6 @@ import os
 import json
 import time
 import socket
-import struct
 import pyttsx3
 import datetime
 import numpy as np

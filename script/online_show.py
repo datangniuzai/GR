@@ -83,10 +83,8 @@ def online_td_calc(gestures: list, model_path: str,data_queue: Queue, event: Eve
             event.clear()
 
 class DataReceiver(QThread):
-    """
-    这个线程从队列中接收数据并通过信号更新界面。
-    """
-    data_received = pyqtSignal(str)  # 用于发出数据更新信号
+
+    data_received = pyqtSignal(str)
 
     def __init__(self, gesture_queue: Queue, event: Event):
         super().__init__()
@@ -106,12 +104,10 @@ class GestureApp(QWidget):
 
         self.setWindowTitle("Real-Time Gesture Prediction")
         self.setGeometry(100, 100, 400, 300)
-        self.setStyleSheet("background-color: #f0f0f0;")  # 设置背景颜色
+        self.setStyleSheet("background-color: #f0f0f0;")
 
-        # 设置主布局
         self.layout = QVBoxLayout()
 
-        # 创建标签显示预测结果
         self.gesture_label = QLabel("Predicted gesture: Waiting for input...", self)
         self.gesture_label.setAlignment(Qt.AlignCenter)
         self.gesture_label.setStyleSheet("""
@@ -123,7 +119,6 @@ class GestureApp(QWidget):
             padding: 10px;
         """)
 
-        # 创建一个更新按钮
         self.update_button = QPushButton("Update Prediction", self)
         self.update_button.setStyleSheet("""
             background-color: #4CAF50;
@@ -135,11 +130,9 @@ class GestureApp(QWidget):
         """)
         self.update_button.clicked.connect(self.update_gesture)
 
-        # 将控件添加到布局
         self.layout.addWidget(self.gesture_label)
         self.layout.addWidget(self.update_button)
 
-        # 设置窗口的布局
         self.setLayout(self.layout)
 
         self.data_receiver = DataReceiver(gesture_queue, event)
@@ -152,7 +145,7 @@ class GestureApp(QWidget):
 
 
 if __name__ == "__main__":
-    # todo 更改手势列表
+    # todo change the gesture list
     gesture_list = [
         "Wave",
         "Fist",

@@ -199,7 +199,7 @@ def cnn_mode_creat():
     reshape_layer = TimeDistributed(Flatten(), name='reshape_layer')(input_layer)
 
     cnn1 = Conv1D(filters=10, kernel_size=4, activation='relu', name='cnn1')(reshape_layer)
-    cnn2 = Conv1D(filters=20, kernel_size=4, activation='relu', name='cnn2')(cnn1)
+    cnn2 = Conv1D(filters=20, kernel_size=3, activation='relu', name='cnn2')(cnn1)
 
     flatten1 = Flatten(name='flatten_1')(cnn2)
 
@@ -245,6 +245,8 @@ def bilstm_model_creat():
 
     model.summary()
 
+    return model
+
 def cnn_bilstm_model_creat():
 
     cf.model_name = "CNN-BiLSTM"
@@ -254,7 +256,7 @@ def cnn_bilstm_model_creat():
     reshape_layer = tf.keras.layers.TimeDistributed(tf.keras.layers.Flatten(), name='reshape_layer')(input_layer)
 
     cnn1 = tf.keras.layers.Conv1D(filters=10, kernel_size=4, activation='relu', name='cnn1')(reshape_layer)
-    cnn2 = tf.keras.layers.Conv1D(filters=20, kernel_size=4, activation='relu', name='cnn2')(cnn1)
+    cnn2 = tf.keras.layers.Conv1D(filters=20, kernel_size=3, activation='relu', name='cnn2')(cnn1)
 
     bi_lstm1 = tf.keras.layers.Bidirectional(
         tf.keras.layers.LSTM(units=32, return_sequences=True, dropout=0.35, recurrent_dropout=0.15, name='lstm_1'),
@@ -276,6 +278,35 @@ def cnn_bilstm_model_creat():
     model = tf.keras.Model(inputs=input_layer, outputs=output_layer)
 
     nadam_optimizer = tf.keras.optimizers.Nadam()
+    model.compile(optimizer=nadam_optimizer, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+
+    model.summary()
+
+    return model
+
+# ---------------- #
+#  Ablation Study  #
+# ---------------- #
+def tccnn_mode_creat_ablation_study():
+    cf.model_name = "TCCNN"
+
+    input_layer = Input(shape=cf.feature_shape, name='input_layer')
+
+    tccnn_1 = (TCCNNLayer(filters=10, kernel_size=(5, 5), name='tccnn_1', dropout_rate=0.3)
+               (input_layer, first_tccnn_layer=False, last_tccnn_layer=False))
+    tccnn_2 = (TCCNNLayer(filters=20, kernel_size=(10, 5), name='tccnn_2', dropout_rate=0.2)
+               (tccnn_1, first_tccnn_layer=False, last_tccnn_layer=False))
+
+    flatten_1 = Flatten(name='flatten_1')(tccnn_2)
+
+    dense1 = tf.keras.layers.Dense(units=120, activation='relu', name='dense_last')(flatten_1)
+
+    output_layer = Dense(units=cf.gesture_num, activation='softmax', name='output_layer_last')(dense1)
+
+    model = Model(inputs=input_layer, outputs=output_layer)
+
+    nadam_optimizer = tf.keras.optimizers.Nadam()
+
     model.compile(optimizer=nadam_optimizer, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
 
     model.summary()

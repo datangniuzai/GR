@@ -1,4 +1,10 @@
-﻿import tensorflow as tf
+﻿# -*- coding: utf-8 -*-
+# @Time : 2024/2/11 23:20
+# @Author : Yuxin Zhao
+# @File : GAT_GRU.py
+# @Software: Vscode
+
+import tensorflow as tf
 
 from model_file.GAT import GAT
 
@@ -29,28 +35,28 @@ class GatGru(tf.keras.layers.Layer):
     def build(self, input_shape):
         """Initialize weights and biases used in the layer."""
         self.W_z = self.add_weight(
-            shape=(self.in_channels, self.out_channels),
+            shape=(self.out_channels, self.in_channels),
             initializer='he_normal',
             trainable=True,
             name='W_z'
         )
         
         self.Z_bias = self.add_weight(
-            shape=(1, self.out_channels),
+            shape=(self.out_channels,1),
             initializer='he_normal',
             trainable=True,
             name='Z_bias'
         )
 
         self.W_h = self.add_weight(
-            shape=(self.in_channels, self.out_channels),
+            shape=(self.out_channels, self.in_channels),
             initializer='he_normal',
             trainable=True,
             name='W_h'
         )
 
         self.H_bias = self.add_weight(
-            shape=(1, self.out_channels),
+            shape=(self.out_channels,1),
             initializer='he_normal',
             trainable=True,
             name='H_bias'
@@ -76,20 +82,21 @@ class GatGru(tf.keras.layers.Layer):
         if h is None:
 
             batch_size = tf.shape(x)[0]
-            shape = (batch_size, x.shape[2], self.out_channels)
+            channels = tf.shape(x)[-1]
+            shape = (batch_size, self.out_channels, channels)
             h = tf.zeros(shape, dtype=tf.float32)
 
         return h
 
     def _calculate_update_gate(self, x, edge_index, h):
         z = self.conv_z(inputs=x, bias_mat=edge_index)
-        z = z +tf.matmul(x,self.W_z)+self.Z_bias+h
+        z = self.Z_bias + tf.matmul(self.W_z,x) + z + h
         z = tf.sigmoid(z)
         return z
 
     def _calculate_hidden_state(self, x, edge_index, h, z):
         t = self.conv_h(inputs=x, bias_mat=edge_index)
-        t = t + h +tf.matmul(x,self.W_h)+self.H_bias
+        t = self.H_bias+tf.matmul(self.W_h,x) + t + h
         t = tf.tanh(t)
         h = z * h +(1-z)*t
         return h

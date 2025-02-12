@@ -8,7 +8,7 @@ from model_file.GAT_GRU import GatGru
 def creat_model():
     # todo Delete this code when the model dimension is adapted.
     num_time_step, num_features, num_channels = cf.feature_shape
-    temp_feature_shape= [num_time_step, num_channels, num_features]
+    temp_feature_shape= [num_time_step, num_features, num_channels]
 
     gat_gru_layer = GatGru(
         in_channels= 5,

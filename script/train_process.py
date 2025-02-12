@@ -283,10 +283,10 @@ def model_train():
 
     x_val, adjacency_val, y_val, *unused = load_tfrecord_to_list(cf.data_path + "processed_data/data_contact_val.tfrecord")
     x_train, adjacency_train, y_train, *unused = load_tfrecord_to_list(cf.data_path + "processed_data/data_contact_train.tfrecord")
-
+    '''
     x_val = trans_dim(x_val)
     x_train = x_train(x_val)
-
+    '''
     train_dataset = tf.data.Dataset.from_tensor_slices(((adjacency_train,x_train),y_train)).shuffle(len(x_train)).batch(32)
     val_dataset = tf.data.Dataset.from_tensor_slices(((adjacency_val,x_val),y_val)).batch(16)
 

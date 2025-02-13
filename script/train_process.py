@@ -239,9 +239,9 @@ def plot_confusion_matrix(data_test_path: str = None, model_path: str = None, fi
     cf.model.load_weights(model_path)
 
     tensor_x_test, tensor_adjacency_test, tensor_y_test = load_tfrecord_data_adjacency_label(data_test_path)
-
+    '''
     tensor_x_test = trans_dim(tensor_x_test)
-
+    '''
     y_pred_prob = cf.model.predict([tensor_adjacency_test, tensor_x_test])
     y_pred = np.argmax(y_pred_prob, axis=1)
 

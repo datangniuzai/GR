@@ -6,8 +6,12 @@
 
 import os
 import time
+import sys
 os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
-
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.append(project_root)
+    print("已将项目根目录添加到 sys.path")
 import config as cf
 from model_file import creat_model
 from train_process import model_train

@@ -61,14 +61,14 @@ def calc_td(data: np.ndarray) -> np.ndarray:
     return normalized_features
 
 def z_score_normalize_per_feature(features: np.ndarray) -> np.ndarray:
-    normalized_features = (features - np.mean(features, axis=(0, 2), keepdims=True)) / np.std(features, axis=(0, 1), keepdims=True)
+    normalized_features = (features - np.mean(features, axis=(0, 2), keepdims=True)) / np.std(features, axis=(0, 2), keepdims=True)
     return normalized_features
 
 def z_score_normalize_per_channel(features: np.ndarray) -> np.ndarray:
-    normalized_features = (features - np.mean(features, axis=(0, 1), keepdims=True)) / np.std(features, axis=(0, 2), keepdims=True)
+    normalized_features = (features - np.mean(features, axis=(0, 1), keepdims=True)) / np.std(features, axis=(0, 1), keepdims=True)
     return normalized_features
 
-def z_score_normalize_per_window(features: np.ndarray) -> np.ndarray:
+def z_score_normalize_per_timestep(features: np.ndarray) -> np.ndarray:
     normalized_features = (features - np.mean(features, axis=(1, 2), keepdims=True)) / np.std(features, axis=(1, 2), keepdims=True)
     return normalized_features
 
@@ -82,7 +82,7 @@ def min_max_normalize_per_channel(features: np.ndarray) -> np.ndarray:
     features_max = np.max(features, axis=(0, 1), keepdims=True)
     return (features - features_min) / (features_max - features_min)
 
-def min_max_normalize_per_window(features: np.ndarray) -> np.ndarray:
+def min_max_normalize_per_timestep(features: np.ndarray) -> np.ndarray:
     features_min = np.min(features, axis=(1, 2), keepdims=True)
     features_max = np.max(features, axis=(1, 2), keepdims=True)
     return (features - features_min) / (features_max - features_min)

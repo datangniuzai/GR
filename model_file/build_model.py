@@ -96,6 +96,7 @@ class TCCNNLayer(Layer):
 
         self.filters = filters
         self.kernel_size = kernel_size
+        self.pad_size = kernel_size[0] - 1
         self.activation = activation
         self.strides = strides
         self.use_batch_norm = use_batch_norm
@@ -145,11 +146,17 @@ class TCCNNLayer(Layer):
         """
         Apply circular padding along the channels dimension.
         """
-        pad_size = self.kernel_size[0] // 2
+
+        # pad_size = self.kernel_size[0] // 2
+        # padded_data = tf.concat([
+        #     inputs[:, :, :, -pad_size:],  # Last pad_size channels (for left padding)
+        #     inputs,  # Original input
+        #     inputs[:, :, :, :pad_size]  # First pad_size channels (for right padding)
+        # ], axis=3)
+
         padded_data = tf.concat([
-            inputs[:, :, :, -pad_size:],  # Last pad_size channels (for left padding)
-            inputs,  # Original input
-            inputs[:, :, :, :pad_size]  # First pad_size channels (for right padding)
+            inputs[:, :, :, - self.pad_size:],
+            inputs,
         ], axis=3)
         return padded_data
 

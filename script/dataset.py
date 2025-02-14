@@ -138,7 +138,7 @@ def reset_adj(graph_count: int) -> Any:
     """
     init_adj = np.array([build_one_adjacency()] * graph_count)
 
-    sampled_adj = sample_neighbors(init_adj, 5)
+    sampled_adj = sample_neighbors(init_adj, 3)
 
     filled_adj = fill_new_adjacency_matrix(sampled_adj, graph_count, 64)
 
@@ -155,7 +155,7 @@ def calc_td(data: np.ndarray) -> np.ndarray:
     Extract only time-domain features, add small windows. Feature order: MAV, RMS, MSE, Zero-crossings, WAMP.
 
     :param data: Input data matrix with shape (num_channels, signal_length)
-    :return: Extracted features with shape (num_windows, num_channels, 5)
+    :return: Extracted features with shape (num_windows, 5, num_channels)
     """
     signal_length, num_channels, = data.shape
 
@@ -192,11 +192,11 @@ def calc_td(data: np.ndarray) -> np.ndarray:
     return normalized_features
 
 def z_score_normalize_per_feature(features: np.ndarray) -> np.ndarray:
-    normalized_features = (features - np.mean(features, axis=(0, 2), keepdims=True)) / np.std(features, axis=(0, 1), keepdims=True)
+    normalized_features = (features - np.mean(features, axis=(0, 2), keepdims=True)) / np.std(features, axis=(0, 2), keepdims=True)
     return normalized_features
 
 def z_score_normalize_per_channel(features: np.ndarray) -> np.ndarray:
-    normalized_features = (features - np.mean(features, axis=(0, 1), keepdims=True)) / np.std(features, axis=(0, 2), keepdims=True)
+    normalized_features = (features - np.mean(features, axis=(0, 1), keepdims=True)) / np.std(features, axis=(0, 1), keepdims=True)
     return normalized_features
 
 def z_score_normalize_per_window(features: np.ndarray) -> np.ndarray:
@@ -218,6 +218,17 @@ def min_max_normalize_per_window(features: np.ndarray) -> np.ndarray:
     features_max = np.max(features, axis=(1, 2), keepdims=True)
     return (features - features_min) / (features_max - features_min)
 
+def max_normalize_per_feature(features: np.ndarray) -> np.ndarray:
+    features_max = np.max(features, axis=(0, 1), keepdims=True)
+    return features  / features_max 
+
+def max_normalize_per_channel(features: np.ndarray) -> np.ndarray:
+    features_max = np.max(features, axis=(0, 2), keepdims=True)
+    return features  / features_max 
+
+def max_normalize_per_window(features: np.ndarray) -> np.ndarray:
+    features_max = np.max(features, axis=(1, 2), keepdims=True)
+    return features  / features_max 
 # ------------------------------ #
 #   Tfrecord Build Function      #
 # ------------------------------ #

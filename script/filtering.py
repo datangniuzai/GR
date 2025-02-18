@@ -5,6 +5,9 @@
 # @File : filtering.py
 # @Software: PyCharm
 
+import os
+os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+
 import numpy as np
 import pandas as pd
 from scipy import signal
@@ -47,8 +50,8 @@ def filter_and_save_data() -> None:
     :return: None
     """
     for gesture_number in cf.gesture:
-        input_path: str = cf.data_path + f'output_data/sEMG_data{gesture_number}.csv'
-        output_path: str = cf.data_path + f"process_data/filtered_data{gesture_number}.csv"
+        input_path: str = cf.data_path + f'original_data/sEMG_data{gesture_number}.csv'
+        output_path: str = cf.data_path + f"processed_data/filtered_data{gesture_number}.csv"
 
         df: np.ndarray = pd.read_csv(input_path, header=None).to_numpy()
 
@@ -63,3 +66,6 @@ def filter_and_save_data() -> None:
                 np.savetxt(f, filtered_data, delimiter=',', fmt='%.6f')
 
         print(f"Data for gesture number {gesture_number} has been successfully processed")
+if __name__ == '__main__':
+    cf.config_read()
+    filter_and_save_data()

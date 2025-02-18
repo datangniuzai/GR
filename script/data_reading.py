@@ -12,6 +12,7 @@ import socket
 import pyttsx3
 import datetime
 import numpy as np
+import struct
 
 import config as cf
 
@@ -56,7 +57,7 @@ def sEMG_data_read_save():
                 collected_samples = 0
                 while collected_samples < reallocated_data_size:
                     data, addr = udp_socket.recvfrom(1300)
-                    reshaped_data = np.frombuffer(data[18:1298], dtype='<i2').reshape(10, 64)
+                    reshaped_data = np.reshape(np.array(struct.unpack('<640h', data[18:1298])), (10, 64))
                     output_data[collected_samples:collected_samples + 10, :] = reshaped_data
                     collected_samples += 10
 

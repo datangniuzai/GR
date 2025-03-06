@@ -15,7 +15,7 @@ import numpy as np
 import tensorflow as tf
 from PyQt5.QtGui import QPixmap, QFont
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
-from multiprocessing import Queue, Process, Event
+from multiprocessing import Queue, Event
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QPushButton
 
 import config as cf
@@ -83,7 +83,7 @@ def model_predictor(data_queue, gesture_to_show_queue, model_path):
 class GestureApp(QWidget):
     def __init__(self, gesture_queue: Queue, event: Event):
         super().__init__()
-        self.ser = serial.Serial('COM1',115200)
+        self.ser = serial.Serial('COM6',115200)
         print(self.ser)
         self.setWindowTitle("Real-Time Gesture Prediction")
         self.setGeometry(100, 100, 600, 600)
@@ -127,12 +127,40 @@ class GestureApp(QWidget):
         self.data_receiver.start()
 
     def update_gesture(self, gesture_number: int):
-        gesture_info = GESTURE_MAPPING.get(gesture_number, {"name": "Unknown", "image": ""})
+        if not hasattr(self, "stable_gesture"):
+            self.stable_gesture = gesture_number
+            self.last_gesture = gesture_number
+            self.candidate_gesture = None
+            self.candidate_count = 0
+        else:
+
+            if gesture_number == self.stable_gesture:
+                self.candidate_gesture = None
+                self.candidate_count = 0
+                return
+
+            if gesture_number == self.candidate_gesture:
+                self.candidate_count += 1
+                if self.candidate_count > 2:
+                    self.stable_gesture = self.candidate_gesture
+                    self.candidate_gesture = None
+                    self.candidate_count = 0
+            else:
+                self.candidate_gesture = gesture_number
+                self.candidate_count = 1
+
+        gesture_info = GESTURE_MAPPING.get(
+            self.stable_gesture,
+            {"name": "Unknown", "image": "", "angles": []}
+        )
+
         gesture_name = gesture_info["name"]
-        image_path = gesture_info["image"]
-        angles = gesture_info["angles"]
+        image_path = gesture_info.get("image", "")
+        angles = gesture_info.get("angles", [])
         self.gesture_label.setText(f"Predicted gesture: {gesture_name}")
-        self.update_image(image_path,angles)
+
+        if self.stable_gesture == gesture_number:
+            self.update_image(image_path, angles)
 
     def update_image(self, image_path: str,angles):
         if image_path:

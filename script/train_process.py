@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # @Time : 2024/11/14 20:45
-# @Author : Jiaxuan LI
+# @Author : Jason.LI
 # @File : train_process.py
 # @Software: PyCharm
 

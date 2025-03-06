@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # @Time : 2024/11/14 19:48
-# @Author : Jiaxuan LI
+# @Author : Jason.LI
 # @File : filtering.py
 # @Software: PyCharm
 

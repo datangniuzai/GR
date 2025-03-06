@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # @Time : 2024/02/01 19:43
-# @Author : Jiaxuan LI
+# @Author : Jason.LI
 # @File : build_model.py
 # @Software: PyCharm
 

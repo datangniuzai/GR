@@ -239,9 +239,9 @@ def plot_confusion_matrix(data_test_path: str = None, model_path: str = None, fi
     cf.model.load_weights(model_path)
 
     tensor_x_test, tensor_adjacency_test, tensor_y_test = load_tfrecord_data_adjacency_label(data_test_path)
-
+    '''
     tensor_x_test = trans_dim(tensor_x_test)
-
+    '''
     y_pred_prob = cf.model.predict([tensor_adjacency_test, tensor_x_test])
     y_pred = np.argmax(y_pred_prob, axis=1)
 
@@ -283,10 +283,10 @@ def model_train():
 
     x_val, adjacency_val, y_val, *unused = load_tfrecord_to_list(cf.data_path + "processed_data/data_contact_val.tfrecord")
     x_train, adjacency_train, y_train, *unused = load_tfrecord_to_list(cf.data_path + "processed_data/data_contact_train.tfrecord")
-
+    '''
     x_val = trans_dim(x_val)
     x_train = x_train(x_val)
-
+    '''
     train_dataset = tf.data.Dataset.from_tensor_slices(((adjacency_train,x_train),y_train)).shuffle(len(x_train)).batch(32)
     val_dataset = tf.data.Dataset.from_tensor_slices(((adjacency_val,x_val),y_val)).batch(16)
 

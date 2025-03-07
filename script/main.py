@@ -6,7 +6,11 @@
 
 import os
 import time
+import sys
 os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.append(project_root)
 
 import config as cf
 from model_file import creat_model

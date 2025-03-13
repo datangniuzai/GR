@@ -14,6 +14,7 @@ import tensorflow as tf
 
 import config as cf
 from filtering import bandpass_and_notch_filter
+from calculate_features import mav,mse,zc,wamp,rms
 
 # ------------------------------ #
 #   Feature Extraction Function  #
@@ -26,7 +27,7 @@ def calc_td(data: np.ndarray) -> np.ndarray:
     :param data: Input data matrix with shape (num_channels, signal_length)
     :return: Extracted features with shape (num_windows, num_channels, 5)
     """
-    signal_length, num_channels, = data.shape
+    signal_length, num_channels = data.shape
 
     num_windows = (signal_length - cf.window_size_little) // cf.step_size_little + 1
 
@@ -35,24 +36,18 @@ def calc_td(data: np.ndarray) -> np.ndarray:
     willison_threshold = 20 / cf.scaling
 
     for i in range(num_windows):
-
         start = i * cf.step_size_little
         end = start + cf.window_size_little
         windowed_data = data[start:end, :]
-
-        # Mean Absolute Value (MAV)
-        mav = np.mean(np.abs(windowed_data), axis=0)
-        # Root Mean Square (RMS)
-        rms = np.sqrt(np.mean(windowed_data ** 2, axis=0))
-        # Mean Squared Error (MSE)
-        mse = np.mean((windowed_data - np.mean(windowed_data, axis=0, keepdims=True)) ** 2, axis=0)
-        # Zero-crossings
-        zero_crossings = np.sum(np.diff(np.sign(windowed_data), axis=0) != 0, axis=0)
-        # Willison Amplitude (WAMP)
-        willison_amplitudes = np.sum(np.abs(np.diff(windowed_data, axis=0)) > willison_threshold, axis=0)
-        # Stack the features together
-        feature = np.array([mav, rms, mse, zero_crossings, willison_amplitudes])
-
+        feature = np.array(
+            [
+                mav(windowed_data),
+                rms(windowed_data),
+                mse(windowed_data),
+                zc(windowed_data),
+                wamp(windowed_data, willison_threshold),
+            ]
+        )
         features.append(feature)
 
     features = np.array(features)
@@ -60,36 +55,50 @@ def calc_td(data: np.ndarray) -> np.ndarray:
 
     return normalized_features
 
+
 def z_score_normalize_per_feature(features: np.ndarray) -> np.ndarray:
-    normalized_features = (features - np.mean(features, axis=(0, 2), keepdims=True)) / np.std(features, axis=(0, 2), keepdims=True)
+    normalized_features = (features - np.mean(features, axis=(0, 2), keepdims=True)) / np.std(
+        features, axis=(0, 2), keepdims=True
+    )
     return normalized_features
+
 
 def z_score_normalize_per_channel(features: np.ndarray) -> np.ndarray:
-    normalized_features = (features - np.mean(features, axis=(0, 1), keepdims=True)) / np.std(features, axis=(0, 1), keepdims=True)
+    normalized_features = (features - np.mean(features, axis=(0, 1), keepdims=True)) / np.std(
+        features, axis=(0, 1), keepdims=True
+    )
     return normalized_features
 
+
 def z_score_normalize_per_timestep(features: np.ndarray) -> np.ndarray:
-    normalized_features = (features - np.mean(features, axis=(1, 2), keepdims=True)) / np.std(features, axis=(1, 2), keepdims=True)
+    normalized_features = (features - np.mean(features, axis=(1, 2), keepdims=True)) / np.std(
+        features, axis=(1, 2), keepdims=True
+    )
     return normalized_features
+
 
 def min_max_normalize_per_feature(features: np.ndarray) -> np.ndarray:
     features_min = np.min(features, axis=(0, 2), keepdims=True)
     features_max = np.max(features, axis=(0, 2), keepdims=True)
     return (features - features_min) / (features_max - features_min)
 
+
 def min_max_normalize_per_channel(features: np.ndarray) -> np.ndarray:
     features_min = np.min(features, axis=(0, 1), keepdims=True)
     features_max = np.max(features, axis=(0, 1), keepdims=True)
     return (features - features_min) / (features_max - features_min)
+
 
 def min_max_normalize_per_timestep(features: np.ndarray) -> np.ndarray:
     features_min = np.min(features, axis=(1, 2), keepdims=True)
     features_max = np.max(features, axis=(1, 2), keepdims=True)
     return (features - features_min) / (features_max - features_min)
 
+
 # ------------------------------ #
 #   Tfrecord Build Function      #
 # ------------------------------ #
+
 
 def tfrecord_establish(df: np.ndarray, gesture_number: int, dataset_type: str):
     """
@@ -110,11 +119,12 @@ def tfrecord_establish(df: np.ndarray, gesture_number: int, dataset_type: str):
 
     for read_time in range(1, cf.turn_read_sum + 1):
         if read_time in getattr(cf, f"{dataset_type}_nums"):
-            single_acquire_data = df[(read_time - 1) * (cf.time_preread * cf.sample_rate):read_time * (
-                        cf.time_preread * cf.sample_rate), :]
+            single_acquire_data = df[
+                (read_time - 1) * (cf.time_preread * cf.sample_rate) : read_time * (cf.time_preread * cf.sample_rate), :
+            ]
             single_acquire_data = bandpass_and_notch_filter(single_acquire_data)
             for j in range(0, single_acquire_data.shape[0] - cf.window_size + 1, cf.step_size):
-                window_data = single_acquire_data[j:j + cf.window_size, :]
+                window_data = single_acquire_data[j : j + cf.window_size, :]
                 window_data_features.append(calc_td(window_data))
                 window_data_labels.append(gesture_number - 1)
                 window_data_time_preread_indexes.append(read_time)
@@ -126,7 +136,8 @@ def tfrecord_establish(df: np.ndarray, gesture_number: int, dataset_type: str):
     window_index_tensor = tf.convert_to_tensor(window_data_window_indexes, dtype=tf.uint8)
 
     dataset = tf.data.Dataset.from_tensor_slices(
-        (window_data_feature_tensor, label_tensor, time_preread_index_tensor, window_index_tensor))
+        (window_data_feature_tensor, label_tensor, time_preread_index_tensor, window_index_tensor)
+    )
 
     save_path = os.path.join(cf.data_path, "processed_data")
     os.makedirs(save_path, exist_ok=True)
@@ -136,30 +147,34 @@ def tfrecord_establish(df: np.ndarray, gesture_number: int, dataset_type: str):
 
     cf.feature_shape = window_data_features[1].shape
 
+
 def tfrecord_connect():
 
-    for dataset_type in ['train','test','val']:
+    for dataset_type in ["train", "test", "val"]:
 
         merged_dataset = None
 
         for gesture_number in cf.gesture:
 
-            dataset= load_tfrecord_to_dataset(cf.data_path + f"processed_data/data_{gesture_number}_{dataset_type}.tfrecord")
+            dataset = load_tfrecord_to_dataset(
+                cf.data_path + f"processed_data/data_{gesture_number}_{dataset_type}.tfrecord"
+            )
 
             if merged_dataset is None:
                 merged_dataset = dataset
             else:
                 merged_dataset = merged_dataset.concatenate(dataset)
 
-        connect_tfrecord_save_path = os.path.join(cf.data_path,f"processed_data/data_contact_{dataset_type}.tfrecord")
+        connect_tfrecord_save_path = os.path.join(cf.data_path, f"processed_data/data_contact_{dataset_type}.tfrecord")
 
-        tfrecord_save(merged_dataset,connect_tfrecord_save_path)
+        tfrecord_save(merged_dataset, connect_tfrecord_save_path)
 
         print(f"[{dataset_type}] data has been merged and saved at [{connect_tfrecord_save_path}]")
 
     print("data connection over")
 
-def tfrecord_save(dataset :tf.data.Dataset,tfrecord_save_path:str):
+
+def tfrecord_save(dataset: tf.data.Dataset, tfrecord_save_path: str):
     """
     Save the dataset as a TFRecord file.
 
@@ -171,20 +186,23 @@ def tfrecord_save(dataset :tf.data.Dataset,tfrecord_save_path:str):
     Converts each item in the dataset (window data, labels, etc.) to `tf.train.Example` format and writes it to the specified TFRecord file.
     """
     with tf.io.TFRecordWriter(tfrecord_save_path) as writer:
-        for window, label,time_preread_index, window_index in dataset:
+        for window, label, time_preread_index, window_index in dataset:
             feature = {
-                'window': tf.train.Feature(float_list=tf.train.FloatList(value=window.numpy().flatten())),
-                'label': tf.train.Feature(int64_list=tf.train.Int64List(value=[label.numpy().item()])),
-                'time_preread_index': tf.train.Feature(
-                    int64_list=tf.train.Int64List(value=[time_preread_index.numpy().item()])),
-                'window_index': tf.train.Feature(int64_list=tf.train.Int64List(value=[window_index.numpy().item()])),
+                "window": tf.train.Feature(float_list=tf.train.FloatList(value=window.numpy().flatten())),
+                "label": tf.train.Feature(int64_list=tf.train.Int64List(value=[label.numpy().item()])),
+                "time_preread_index": tf.train.Feature(
+                    int64_list=tf.train.Int64List(value=[time_preread_index.numpy().item()])
+                ),
+                "window_index": tf.train.Feature(int64_list=tf.train.Int64List(value=[window_index.numpy().item()])),
             }
             example = tf.train.Example(features=tf.train.Features(feature=feature))
             writer.write(example.SerializeToString())
 
+
 # ----------------------------- #
 #   Tfrecord Loading Function   #
 # ----------------------------- #
+
 
 def _parse_function(proto: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
     """
@@ -197,19 +215,20 @@ def _parse_function(proto: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, 
     Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]: Parsed data including window data, label, time preread index, and window index.
     """
     keys_to_features: Dict[str, tf.io.FixedLenFeature] = {
-        'window': tf.io.FixedLenFeature(cf.feature_shape, tf.float32),
-        'label': tf.io.FixedLenFeature([1], tf.int64),
-        'time_preread_index': tf.io.FixedLenFeature([1], tf.int64),
-        'window_index': tf.io.FixedLenFeature([1], tf.int64)
+        "window": tf.io.FixedLenFeature(cf.feature_shape, tf.float32),
+        "label": tf.io.FixedLenFeature([1], tf.int64),
+        "time_preread_index": tf.io.FixedLenFeature([1], tf.int64),
+        "window_index": tf.io.FixedLenFeature([1], tf.int64),
     }
 
     data = tf.io.parse_single_example(proto, keys_to_features)
 
-    data['label'] = tf.cast(data['label'], tf.uint8)
-    data['time_preread_index'] = tf.cast(data['time_preread_index'], tf.uint8)
-    data['window_index'] = tf.cast(data['window_index'], tf.uint8)
+    data["label"] = tf.cast(data["label"], tf.uint8)
+    data["time_preread_index"] = tf.cast(data["time_preread_index"], tf.uint8)
+    data["window_index"] = tf.cast(data["window_index"], tf.uint8)
 
-    return data["window"], data['label'], data['time_preread_index'], data['window_index']
+    return data["window"], data["label"], data["time_preread_index"], data["window_index"]
+
 
 def load_tfrecord_to_dataset(tfrecord_path: str) -> tf.data.Dataset:
     """
@@ -227,6 +246,7 @@ def load_tfrecord_to_dataset(tfrecord_path: str) -> tf.data.Dataset:
     dataset = dataset.map(_parse_function)
 
     return dataset
+
 
 def load_tfrecord_to_list(tfrecord_path: str) -> Tuple[List[np.ndarray], List[int], List[int], List[int]]:
     """
@@ -251,13 +271,14 @@ def load_tfrecord_to_list(tfrecord_path: str) -> Tuple[List[np.ndarray], List[in
     time_preread_indices: List[int] = []
     window_indices: List[int] = []
 
-    for window_data,label, time_preread_index, window_index in dataset:
+    for window_data, label, time_preread_index, window_index in dataset:
         window_datas.append(window_data.numpy())
         labels.append(label.numpy())
         time_preread_indices.append(time_preread_index.numpy())
         window_indices.append(window_index.numpy())
 
     return window_datas, labels, time_preread_indices, window_indices
+
 
 def load_tfrecord_to_tensor(tfrecord_path: str) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
     """
@@ -297,6 +318,7 @@ def load_tfrecord_to_tensor(tfrecord_path: str) -> Tuple[tf.Tensor, tf.Tensor, t
 
     return window_datas, labels, time_preread_indices, window_indices
 
+
 def load_tfrecord_data_label(tfrecord_path: str) -> Tuple[tf.Tensor, tf.Tensor]:
     """
     Load the TFRecord file and return window data, adjacency matrix, and labels as Tensors.
@@ -325,9 +347,11 @@ def load_tfrecord_data_label(tfrecord_path: str) -> Tuple[tf.Tensor, tf.Tensor]:
 
     return window_datas, labels
 
+
 # ------------------------------------- #
 #  Start--Database_create--main func    #
 # ------------------------------------- #
+
 
 def database_create():
     """
@@ -344,11 +368,12 @@ def database_create():
     )
 
     for gesture_number in cf.gesture:
-        path = cf.data_path + f'original_data/sEMG_data{gesture_number}.csv'
+        path = cf.data_path + f"original_data/sEMG_data{gesture_number}.csv"
         df = pd.read_csv(path, header=None).to_numpy()
-        for dataset_type in ['train', 'val', 'test']:
+        for dataset_type in ["train", "val", "test"]:
             tfrecord_establish(df, gesture_number, dataset_type)
         print(f"Gesture {gesture_number} data processing completed.")
+
 
 # ------------------------------------- #
 #  Over--Database_create--main func     #

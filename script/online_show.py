@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Time : 2025/3/6 11:34
 # @Author : Jason.LI
-# @File : online_show_v0.1.py
+# @File : online_show.py
 # @Software: PyCharm
 
 import threading

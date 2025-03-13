@@ -11,50 +11,53 @@ from typing import List, Tuple, Dict
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+from numpy.lib.stride_tricks import as_strided
 
 import config as cf
 from filtering import bandpass_and_notch_filter
-from calculate_features import mav,mse,zc,wamp,rms
+from calculate_features import mav, mse, zc, wamp, rms
 
 # ------------------------------ #
 #   Feature Extraction Function  #
 # ------------------------------ #
 
-def calc_td(data: np.ndarray) -> np.ndarray:
+def primary_windows(data: np.ndarray, window_size: int, step_size: int) -> np.ndarray:
     """
-    Extract only time-domain features, add small windows. Feature order: MAV, RMS, MSE, Zero-crossings, WAMP.
+    Efficiently split the input data into primary sliding windows.
 
-    :param data: Input data matrix with shape (num_channels, signal_length)
-    :return: Extracted features with shape (num_windows, num_channels, 5)
+    :param data: Input data matrix, shape (signal_length, num_channels)
+    :param window_size: Size of each window
+    :param step_size: Step size between windows
+    :return: Windows with extracted features, shape (num_windows, window_size, num_channels)
     """
     signal_length, num_channels = data.shape
+    num_windows = (signal_length - window_size) // step_size + 1
 
-    num_windows = (signal_length - cf.window_size_little) // cf.step_size_little + 1
+    strided_shape = (num_windows, window_size, num_channels)
+    strided_strides = (step_size * data.strides[0],) + data.strides
 
-    features = []
+    windows = as_strided(data, shape=strided_shape, strides=strided_strides)
 
-    willison_threshold = 20 / cf.scaling
+    return z_score_normalize_per_feature(np.apply_along_axis(secondary_features, 1, windows))
 
-    for i in range(num_windows):
-        start = i * cf.step_size_little
-        end = start + cf.window_size_little
-        windowed_data = data[start:end, :]
-        feature = np.array(
-            [
-                mav(windowed_data),
-                rms(windowed_data),
-                mse(windowed_data),
-                zc(windowed_data),
-                wamp(windowed_data, willison_threshold),
-            ]
-        )
-        features.append(feature)
+def secondary_features(data: np.ndarray) -> np.ndarray:
+    """
+    extract the features from primary windowed_data.
 
-    features = np.array(features)
-    normalized_features = z_score_normalize_per_feature(features)
+    :param data: data of primary windowed_data，shape: (num_windows, window_size, num_channels)
+    :return: the matrix of data's features，shape: (num_windows, num_channels, num_features)
+    """
+    features = np.array(
+        [
+            mav(data),
+            rms(data),
+            mse(data),
+            zc(data),
+            wamp(data),
+        ]
+    )
 
-    return normalized_features
-
+    return np.array(features)
 
 def z_score_normalize_per_feature(features: np.ndarray) -> np.ndarray:
     normalized_features = (features - np.mean(features, axis=(0, 2), keepdims=True)) / np.std(
@@ -125,7 +128,7 @@ def tfrecord_establish(df: np.ndarray, gesture_number: int, dataset_type: str):
             single_acquire_data = bandpass_and_notch_filter(single_acquire_data)
             for j in range(0, single_acquire_data.shape[0] - cf.window_size + 1, cf.step_size):
                 window_data = single_acquire_data[j : j + cf.window_size, :]
-                window_data_features.append(calc_td(window_data))
+                window_data_features.append(primary_windows(window_data))
                 window_data_labels.append(gesture_number - 1)
                 window_data_time_preread_indexes.append(read_time)
                 window_data_window_indexes.append(j)

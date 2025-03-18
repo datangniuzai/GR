@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from numpy.lib.stride_tricks import as_strided
+from concurrent.futures import ProcessPoolExecutor
 
 import config as cf
 from filtering import bandpass_and_notch_filter
@@ -21,24 +22,119 @@ from calculate_features import mav, mse, zc, wamp, rms
 #   Feature Extraction Function  #
 # ------------------------------ #
 
-def primary_windows(data: np.ndarray, window_size: int, step_size: int) -> np.ndarray:
+
+def tfrecord_establish(df: np.ndarray, gesture_number: int, dataset_type: str):
+    """
+    General data processing function for feature extraction and saving for training, testing, and validation datasets.
+
+    This function extracts features from input signals, processes them, and saves them as TensorFlow TFRecord files.
+
+    :param df: Input signal data (shape: [num_channels, signal_length])
+    :param gesture_number: Gesture identifier (integer)
+    :param dataset_type: Type of dataset ('train'/'test'/'val')
+    """
+
+    if dataset_type == "train":
+        read_times_list = cf.train_nums
+    elif dataset_type == "test":
+        read_times_list = cf.test_nums
+    elif dataset_type == "val":
+        read_times_list = cf.val_nums
+    else:
+        raise ValueError(f"Invalid dataset_type: {dataset_type}. Expected 'train', 'test', or 'val'.")
+
+    window_data_features = []
+    window_data_labels = []
+
+    tasks = [
+        (
+            rt,
+            dataset_type,
+            df,
+            gesture_number,
+            cf.time_preread,
+            cf.sample_rate,
+            cf.window_size,
+            cf.step_size,
+            cf.window_size_little,
+            cf.step_size_little,
+        )
+        for rt in read_times_list
+    ]
+
+    with ProcessPoolExecutor(max_workers=10) as executor:
+        results = executor.map(process_read_time, tasks)
+
+        for f, l in results:
+            window_data_features.extend(f)
+            window_data_labels.extend(l)
+
+    window_data_feature_tensor = tf.convert_to_tensor(window_data_features, dtype=tf.float32)
+    print(window_data_feature_tensor)
+    label_tensor = tf.convert_to_tensor(window_data_labels, dtype=tf.uint8)
+
+    dataset = tf.data.Dataset.from_tensor_slices((window_data_feature_tensor, label_tensor))
+
+    save_path = os.path.join(cf.data_path, "processed_data")
+    os.makedirs(save_path, exist_ok=True)
+
+    tfrecord_path = os.path.join(save_path, f"data_{gesture_number}_{dataset_type}.tfrecord")
+    tfrecord_save(dataset, tfrecord_path)
+
+    cf.feature_shape = window_data_features[0].shape
+
+
+def process_read_time(args):
+    """Wrapper function for parallel processing of a single read_time"""
+    (
+        read_time,
+        dataset_type,
+        df,
+        gesture_number,
+        time_preread,
+        sample_rate,
+        window_size,
+        step_size,
+        secondary_window_size,
+        secondary_step_size,
+    ) = args
+
+    features = []
+    labels = []
+    start = (read_time - 1) * (time_preread * sample_rate)
+    end = read_time * (time_preread * sample_rate)
+    single_acquire_data = df[start:end, :]
+
+    for j in range(0, single_acquire_data.shape[0] - window_size + 1, step_size):
+        window_data = single_acquire_data[j : j + window_size, :]
+        window_data = bandpass_and_notch_filter(window_data)
+        features.append(primary_windows(window_data, secondary_window_size, secondary_step_size))
+        labels.append(gesture_number - 1)
+
+    return features, labels
+
+
+def primary_windows(data: np.ndarray, secondary_window_size: int, secondary_step_size: int) -> np.ndarray:
     """
     Efficiently split the input data into primary sliding windows.
 
     :param data: Input data matrix, shape (signal_length, num_channels)
-    :param window_size: Size of each window
-    :param step_size: Step size between windows
-    :return: Windows with extracted features, shape (num_windows, window_size, num_channels)
+    :param secondary_window_size: Size of each secondary_window
+    :param secondary_step_size: Step size between secondary_window
+    :return: Windows with extracted features, shape (num_windows, secondary_window_size, num_channels)
     """
     signal_length, num_channels = data.shape
-    num_windows = (signal_length - window_size) // step_size + 1
 
-    strided_shape = (num_windows, window_size, num_channels)
-    strided_strides = (step_size * data.strides[0],) + data.strides
+    num_windows = (signal_length - secondary_window_size) // secondary_step_size + 1
 
+    strided_shape = (num_windows, secondary_window_size, num_channels)
+    strided_strides = (secondary_step_size * data.strides[0], data.strides[0], data.strides[1])
     windows = as_strided(data, shape=strided_shape, strides=strided_strides)
 
-    return z_score_normalize_per_feature(np.apply_along_axis(secondary_features, 1, windows))
+    primary_window_feature = min_max_normalize_per_feature(np.apply_along_axis(secondary_features, 1, windows))
+
+    return primary_window_feature
+
 
 def secondary_features(data: np.ndarray) -> np.ndarray:
     """
@@ -58,6 +154,7 @@ def secondary_features(data: np.ndarray) -> np.ndarray:
     )
 
     return np.array(features)
+
 
 def z_score_normalize_per_feature(features: np.ndarray) -> np.ndarray:
     normalized_features = (features - np.mean(features, axis=(0, 2), keepdims=True)) / np.std(
@@ -103,52 +200,26 @@ def min_max_normalize_per_timestep(features: np.ndarray) -> np.ndarray:
 # ------------------------------ #
 
 
-def tfrecord_establish(df: np.ndarray, gesture_number: int, dataset_type: str):
+def database_create():
     """
-    General data processing function for feature extraction and saving for training, testing, and validation datasets.
+    Process the data and create the corresponding TFRecord files for training, testing, and validation datasets.
 
-    This function extracts features from input signals, processes them, and saves them as TensorFlow TFRecord files.
-
-    :param df: Input signal data (shape: [num_channels, signal_length])
-    :param gesture_number: Gesture identifier (integer)
-    :param dataset_type: Type of dataset ('train'/'test'/'val')
-    :return: The element_spec of the dataset
+    Functionality:
+    This function reads sEMG data from CSV files for each gesture, processes it, and saves it as TFRecord files for each dataset type (train, test, val).
     """
-
-    window_data_features = []
-    window_data_labels = []
-    window_data_time_preread_indexes = []
-    window_data_window_indexes = []
-
-    for read_time in range(1, cf.turn_read_sum + 1):
-        if read_time in getattr(cf, f"{dataset_type}_nums"):
-            single_acquire_data = df[
-                (read_time - 1) * (cf.time_preread * cf.sample_rate) : read_time * (cf.time_preread * cf.sample_rate), :
-            ]
-            single_acquire_data = bandpass_and_notch_filter(single_acquire_data)
-            for j in range(0, single_acquire_data.shape[0] - cf.window_size + 1, cf.step_size):
-                window_data = single_acquire_data[j : j + cf.window_size, :]
-                window_data_features.append(primary_windows(window_data))
-                window_data_labels.append(gesture_number - 1)
-                window_data_time_preread_indexes.append(read_time)
-                window_data_window_indexes.append(j)
-
-    window_data_feature_tensor = tf.convert_to_tensor(window_data_features, dtype=tf.float32)
-    label_tensor = tf.convert_to_tensor(window_data_labels, dtype=tf.uint8)
-    time_preread_index_tensor = tf.convert_to_tensor(window_data_time_preread_indexes, dtype=tf.uint8)
-    window_index_tensor = tf.convert_to_tensor(window_data_window_indexes, dtype=tf.uint8)
-
-    dataset = tf.data.Dataset.from_tensor_slices(
-        (window_data_feature_tensor, label_tensor, time_preread_index_tensor, window_index_tensor)
+    print("Processing the data, please wait...")
+    print(
+        f"Using the {cf.train_nums}-th data collection as the training set,\n"
+        f"Using the {cf.test_nums}-th data collection as the test set,\n"
+        f"Using the {cf.val_nums}-th data collection as the validation set.\n"
     )
 
-    save_path = os.path.join(cf.data_path, "processed_data")
-    os.makedirs(save_path, exist_ok=True)
-
-    tfrecord_path = os.path.join(save_path, f"data_{gesture_number}_{dataset_type}.tfrecord")
-    tfrecord_save(dataset, tfrecord_path)
-
-    cf.feature_shape = window_data_features[1].shape
+    for gesture_number in cf.gesture:
+        path = cf.data_path + f"original_data/sEMG_data{gesture_number}.csv"
+        df = pd.read_csv(path, header=None).to_numpy()
+        for dataset_type in ["train", "val", "test"]:
+            tfrecord_establish(df, gesture_number, dataset_type)
+        print(f"Gesture {gesture_number} data processing completed.")
 
 
 def tfrecord_connect():
@@ -189,14 +260,10 @@ def tfrecord_save(dataset: tf.data.Dataset, tfrecord_save_path: str):
     Converts each item in the dataset (window data, labels, etc.) to `tf.train.Example` format and writes it to the specified TFRecord file.
     """
     with tf.io.TFRecordWriter(tfrecord_save_path) as writer:
-        for window, label, time_preread_index, window_index in dataset:
+        for window, label in dataset:
             feature = {
                 "window": tf.train.Feature(float_list=tf.train.FloatList(value=window.numpy().flatten())),
                 "label": tf.train.Feature(int64_list=tf.train.Int64List(value=[label.numpy().item()])),
-                "time_preread_index": tf.train.Feature(
-                    int64_list=tf.train.Int64List(value=[time_preread_index.numpy().item()])
-                ),
-                "window_index": tf.train.Feature(int64_list=tf.train.Int64List(value=[window_index.numpy().item()])),
             }
             example = tf.train.Example(features=tf.train.Features(feature=feature))
             writer.write(example.SerializeToString())
@@ -207,7 +274,7 @@ def tfrecord_save(dataset: tf.data.Dataset, tfrecord_save_path: str):
 # ----------------------------- #
 
 
-def _parse_function(proto: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
+def _parse_function(proto: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
     """
     Parse each Example from the TFRecord file and adjust the data types and shapes.
 
@@ -215,22 +282,18 @@ def _parse_function(proto: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, 
     proto (tf.Tensor): The input TFRecord data.
 
     Returns:
-    Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]: Parsed data including window data, label, time preread index, and window index.
+    Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]: Parsed data including window data, label.
     """
     keys_to_features: Dict[str, tf.io.FixedLenFeature] = {
         "window": tf.io.FixedLenFeature(cf.feature_shape, tf.float32),
         "label": tf.io.FixedLenFeature([1], tf.int64),
-        "time_preread_index": tf.io.FixedLenFeature([1], tf.int64),
-        "window_index": tf.io.FixedLenFeature([1], tf.int64),
     }
 
     data = tf.io.parse_single_example(proto, keys_to_features)
 
     data["label"] = tf.cast(data["label"], tf.uint8)
-    data["time_preread_index"] = tf.cast(data["time_preread_index"], tf.uint8)
-    data["window_index"] = tf.cast(data["window_index"], tf.uint8)
 
-    return data["window"], data["label"], data["time_preread_index"], data["window_index"]
+    return data["window"], data["label"]
 
 
 def load_tfrecord_to_dataset(tfrecord_path: str) -> tf.data.Dataset:
@@ -241,7 +304,7 @@ def load_tfrecord_to_dataset(tfrecord_path: str) -> tf.data.Dataset:
     tfrecord_path (str): Path to the TFRecord file.
 
     Returns:
-    tf.data.Dataset: A TensorFlow dataset containing window data, labels, time preread indices, and window indices.
+    tf.data.Dataset: A TensorFlow dataset containing window data, labels.
     """
 
     dataset = tf.data.TFRecordDataset(tfrecord_path)
@@ -251,7 +314,7 @@ def load_tfrecord_to_dataset(tfrecord_path: str) -> tf.data.Dataset:
     return dataset
 
 
-def load_tfrecord_to_list(tfrecord_path: str) -> Tuple[List[np.ndarray], List[int], List[int], List[int]]:
+def load_tfrecord_to_list(tfrecord_path: str) -> Tuple[List[np.ndarray], List[int]]:
     """
     Load the TFRecord file and return the data as lists.
 
@@ -259,44 +322,35 @@ def load_tfrecord_to_list(tfrecord_path: str) -> Tuple[List[np.ndarray], List[in
     tfrecord_path (str): Path to the TFRecord file.
 
     Returns:
-    Tuple[List[np.ndarray], List[np.ndarray], List[int], List[int], List[int]]:
+    Tuple[List[np.ndarray], List[np.ndarray], List[int]]:
         A tuple containing:
         - window_datas (List[np.ndarray]): List of window data arrays.
         - labels (List[int]): List of label integers.
-        - time_preread_indices (List[int]): List of time preread indices as integers.
-        - window_indices (List[int]): List of window indices as integers.
     """
     dataset = tf.data.TFRecordDataset(tfrecord_path)
     dataset = dataset.map(_parse_function)
 
     window_datas: List[np.ndarray] = []
     labels: List[int] = []
-    time_preread_indices: List[int] = []
-    window_indices: List[int] = []
 
-    for window_data, label, time_preread_index, window_index in dataset:
+    for window_data, label in dataset:
         window_datas.append(window_data.numpy())
         labels.append(label.numpy())
-        time_preread_indices.append(time_preread_index.numpy())
-        window_indices.append(window_index.numpy())
 
-    return window_datas, labels, time_preread_indices, window_indices
+    return window_datas, labels
 
 
-def load_tfrecord_to_tensor(tfrecord_path: str) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
+def load_tfrecord_to_tensor(tfrecord_path: str) -> Tuple[tf.Tensor, tf.Tensor]:
     """
     Load the TFRecord file and return window data, adjacency matrix, labels,
-    time preread indices, and window indices as Tensors.
 
     Parameters:
     tfrecord_path (str): Path to the TFRecord file.
 
     Returns:
-    Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]: A tuple containing:
+    Tuple[tf.Tensor, tf.Tensor]: A tuple containing:
         - window_datas (tf.Tensor): Tensor containing window data.
         - labels (tf.Tensor): Tensor containing labels.
-        - time_preread_indices (tf.Tensor): Tensor containing time preread indices.
-        - window_indices (tf.Tensor): Tensor containing window indices.
     """
 
     dataset = tf.data.TFRecordDataset(tfrecord_path)
@@ -305,21 +359,15 @@ def load_tfrecord_to_tensor(tfrecord_path: str) -> Tuple[tf.Tensor, tf.Tensor, t
 
     window_datas = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
     labels = tf.TensorArray(dtype=tf.uint8, size=0, dynamic_size=True)
-    time_preread_indices = tf.TensorArray(dtype=tf.uint8, size=0, dynamic_size=True)
-    window_indices = tf.TensorArray(dtype=tf.uint8, size=0, dynamic_size=True)
 
-    for window_data, adjacency, label, time_preread_index, window_index in dataset:
+    for window_data, adjacency, label in dataset:
         window_datas = window_datas.write(window_datas.size(), window_data)
         labels = labels.write(labels.size(), label)
-        time_preread_indices = time_preread_indices.write(time_preread_indices.size(), time_preread_index)
-        window_indices = window_indices.write(window_indices.size(), window_index)
 
     window_datas = window_datas.stack()
     labels = labels.stack()
-    time_preread_indices = time_preread_indices.stack()
-    window_indices = window_indices.stack()
 
-    return window_datas, labels, time_preread_indices, window_indices
+    return window_datas, labels
 
 
 def load_tfrecord_data_label(tfrecord_path: str) -> Tuple[tf.Tensor, tf.Tensor]:
@@ -350,34 +398,5 @@ def load_tfrecord_data_label(tfrecord_path: str) -> Tuple[tf.Tensor, tf.Tensor]:
 
     return window_datas, labels
 
-
-# ------------------------------------- #
-#  Start--Database_create--main func    #
-# ------------------------------------- #
-
-
-def database_create():
-    """
-    Process the data and create the corresponding TFRecord files for training, testing, and validation datasets.
-
-    Functionality:
-    This function reads sEMG data from CSV files for each gesture, processes it, and saves it as TFRecord files for each dataset type (train, test, val).
-    """
-    print("Processing the data, please wait...")
-    print(
-        f"Using the {cf.train_nums}-th data collection as the training set,\n"
-        f"Using the {cf.test_nums}-th data collection as the test set,\n"
-        f"Using the {cf.val_nums}-th data collection as the validation set.\n"
-    )
-
-    for gesture_number in cf.gesture:
-        path = cf.data_path + f"original_data/sEMG_data{gesture_number}.csv"
-        df = pd.read_csv(path, header=None).to_numpy()
-        for dataset_type in ["train", "val", "test"]:
-            tfrecord_establish(df, gesture_number, dataset_type)
-        print(f"Gesture {gesture_number} data processing completed.")
-
-
-# ------------------------------------- #
-#  Over--Database_create--main func     #
-# ------------------------------------- #
+if __name__ == '__main__':
+    cf.config_read()

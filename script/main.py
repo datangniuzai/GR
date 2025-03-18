@@ -18,9 +18,9 @@ if __name__ == '__main__':
     k_fold_cross_validation(2)
 
 
-    # cf.start_time = time.time()
+    cf.start_time = time.time()
     # database_create()
     # tfrecord_connect()
-    # cf.model = tccnn_model_creat()
-    # one_model_train()
-    # cf.end_time = time.time()
+    cf.model = tccnn_model_creat()
+    one_model_train(model_name = "LiteSTFNet")
+    cf.end_time = time.time()

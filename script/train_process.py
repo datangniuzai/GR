@@ -10,6 +10,7 @@ import csv
 import re
 import time
 import datetime
+import warnings
 from typing import Optional, List
 
 import numpy as np
@@ -22,12 +23,12 @@ from sklearn.metrics import accuracy_score, confusion_matrix, recall_score
 
 import config as cf
 from config import split_data
-from dataset import load_tfrecord_to_list, load_tfrecord_data_label,database_create,tfrecord_connect
+from dataset import load_tfrecord_to_list, load_tfrecord_data_label, database_create, tfrecord_connect
 from model_file import tccnn_model_creat, cnn_mode_creat, bilstm_model_creat, cnn_bilstm_model_creat
 
 
 class SaveModelPathCallback(tf.keras.callbacks.Callback):
-    def __init__(self,model_save_path):
+    def __init__(self, model_save_path):
         super().__init__()
         self.model_save_path = model_save_path
 
@@ -38,6 +39,7 @@ class SaveModelPathCallback(tf.keras.callbacks.Callback):
         cf.model_path = model_path
 
         print(f"Model saved at: {model_path}")
+
 
 def make_train_folder(k: int = None, model_name: str = None) -> str:
     """
@@ -56,7 +58,7 @@ def make_train_folder(k: int = None, model_name: str = None) -> str:
     if model_name:
         folder_name = f"{model_name}_{folder_name}"
 
-    main_folder_path = os.path.join(cf.data_path,"all_train_info",folder_name)
+    main_folder_path = os.path.join(cf.data_path, "all_train_info", folder_name)
     os.makedirs(main_folder_path, exist_ok=True)
 
     model_folder_path = os.path.join(main_folder_path, "models")
@@ -72,6 +74,7 @@ def make_train_folder(k: int = None, model_name: str = None) -> str:
     os.makedirs(figures_folder_path, exist_ok=True)
 
     return main_folder_path + "/"
+
 
 def get_models_list(models_folder_path: str) -> List[str]:
     """
@@ -90,7 +93,8 @@ def get_models_list(models_folder_path: str) -> List[str]:
         print(f"Error: No permission to access folder '{models_folder_path}'.")
         return []
 
-def generate_unique_file_path(base_filename: str,file_save_path: str, extension: str) -> str :
+
+def generate_unique_file_path(base_filename: str, file_save_path: str, extension: str) -> str:
 
     existing_files = os.listdir(file_save_path)
     extension = extension
@@ -101,13 +105,15 @@ def generate_unique_file_path(base_filename: str,file_save_path: str, extension:
         counter += 1
         file_name = f"{base_filename}_{counter}{extension}"
 
-    new_file_path = os.path.join(file_save_path,file_name)
+    new_file_path = os.path.join(file_save_path, file_name)
 
     return new_file_path
+
 
 # --------------- #
 #  Save Functions #
 # --------------- #
+
 
 def save_train_history(history: History) -> str:
     """
@@ -124,6 +130,7 @@ def save_train_history(history: History) -> str:
 
     return training_info_csv_path
 
+
 def save_train_config() -> None:
     """
     Save training configuration details to a text file in cf.training_info_path.
@@ -133,35 +140,36 @@ def save_train_config() -> None:
     train_duration_seconds = cf.end_train_time - cf.start_train_time
     train_duration_minutes = train_duration_seconds / 60
 
-    path_save_training_config = os.path.join(cf.training_info_path, f'training_information/training_config.txt')
+    path_save_training_config = os.path.join(cf.training_info_path, f"training_information/training_config.txt")
     os.makedirs(os.path.dirname(path_save_training_config), exist_ok=True)
 
-    with open(path_save_training_config, 'w') as file:
-        file.write(f'Gesture numbers: {cf.gesture}\n')
-        file.write(f'Dataset mode: {cf.tvt_select_mode}\n')
-        file.write(f'Training time: {train_duration_minutes:.2f} minutes\n')
-        file.write(f'Training samples: {cf.train_num}\n')
-        file.write(f'Validation samples: {cf.val_num}\n')
-        file.write(f'Test samples: {cf.test_num}\n')
-        file.write(f'Test data locations: {cf.test_nums}\n')
-        file.write(f'Validation data locations: {cf.val_nums}\n')
-        file.write(f'Training data locations: {cf.train_nums}\n')
-        file.write(f'Primary window size: {cf.window_size}\n')
-        file.write(f'Primary window step size: {cf.step_size}\n')
-        file.write(f'Secondary  window size: {cf.window_size_little}\n')
-        file.write(f'Secondary  window step size: {cf.step_size_little}\n')
-        file.write(f'Epochs: {cf.epochs}\n')
-        file.write(f'Scaling factor: {cf.scaling}\n')
-        file.write(f'Model: {cf.model_name}\n')
+    with open(path_save_training_config, "w") as file:
+        file.write(f"Gesture numbers: {cf.gesture}\n")
+        file.write(f"Dataset mode: {cf.tvt_select_mode}\n")
+        file.write(f"Training time: {train_duration_minutes:.2f} minutes\n")
+        file.write(f"Training samples: {cf.train_num}\n")
+        file.write(f"Validation samples: {cf.val_num}\n")
+        file.write(f"Test samples: {cf.test_num}\n")
+        file.write(f"Test data locations: {cf.test_nums}\n")
+        file.write(f"Validation data locations: {cf.val_nums}\n")
+        file.write(f"Training data locations: {cf.train_nums}\n")
+        file.write(f"Primary window size: {cf.window_size}\n")
+        file.write(f"Primary window step size: {cf.step_size}\n")
+        file.write(f"Secondary  window size: {cf.window_size_little}\n")
+        file.write(f"Secondary  window step size: {cf.step_size_little}\n")
+        file.write(f"Epochs: {cf.epochs}\n")
+        file.write(f"Scaling factor: {cf.scaling}\n")
+        file.write(f"Model: {cf.model_name}\n")
 
     print(f"Total training time: {train_duration_minutes:.2f} minutes")
     print("Training completed!")
     print(f"Saved training info to: {path_save_training_config}\n")
 
+
 def save_test_info_to_csv(
-        data_test_path: Optional[str] = None,
-        models_folder_path: Optional[str] = None,
-        test_info_csv_path: Optional[str] = None
+    data_test_path: Optional[str] = None,
+    models_folder_path: Optional[str] = None,
+    test_info_csv_path: Optional[str] = None,
 ) -> None:
     """
     Save test information (accuracy and recall) of models to a CSV file.
@@ -186,7 +194,7 @@ def save_test_info_to_csv(
         raise ValueError("Model is not initialized. Please provide a valid model.")
 
     if test_info_csv_path is None:
-        if hasattr(cf, 'training_info_path') and cf.training_info_path is not None:
+        if hasattr(cf, "training_info_path") and cf.training_info_path is not None:
             test_info_csv_path = os.path.join(cf.training_info_path, "test_information", "test_info.csv")
         else:
             raise ValueError("The 'training_info_path' is not set.")
@@ -194,40 +202,40 @@ def save_test_info_to_csv(
     if os.path.exists(test_info_csv_path):
         while True:
             user_input = input(f"The file '{test_info_csv_path}' already exists. Do you want to delete it? (y/n): ")
-            if user_input.lower() == 'y':
+            if user_input.lower() == "y":
                 os.remove(test_info_csv_path)
                 print(f"Deleted existing file: {test_info_csv_path}")
                 break
-            elif user_input.lower() == 'n':
+            elif user_input.lower() == "n":
                 print("File was not deleted.")
                 break
             else:
                 print("Invalid input. Please enter 'y' to delete or 'n' to cancel.")
 
     if data_test_path is None:
-        if hasattr(cf, 'data_path') and cf.data_path is not None:
+        if hasattr(cf, "data_path") and cf.data_path is not None:
             data_test_path = os.path.join(cf.data_path, "processed_data", "data_contact_test.tfrecord")
         else:
             raise ValueError("The 'data_path' is not set.")
 
     if models_folder_path is None:
-        if hasattr(cf, 'training_info_path') and cf.training_info_path is not None:
+        if hasattr(cf, "training_info_path") and cf.training_info_path is not None:
             models_folder_path = os.path.join(cf.training_info_path, "models")
         else:
             raise ValueError("The 'model_folder_path' is not set in either the argument or the configuration.")
 
     tensor_x_test, tensor_y_test = load_tfrecord_data_label(data_test_path)
 
-    model_list = [f for f in os.listdir(models_folder_path) if f.endswith('.keras')]
+    model_list = [f for f in os.listdir(models_folder_path) if f.endswith(".keras")]
 
-    header = ['epoch', 'accuracy'] + [f'recall_gesture_{i + 1}' for i in range(cf.gesture_num)]
+    header = ["epoch", "accuracy"] + [f"recall_gesture_{i + 1}" for i in range(cf.gesture_num)]
 
-    with open(test_info_csv_path, 'w', newline='') as f:
+    with open(test_info_csv_path, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(header)
 
     for model in model_list:
-        match = re.search(r'_(\d+)\.keras', model)
+        match = re.search(r"_(\d+)\.keras", model)
 
         if match:
             model_number = match.group(1)
@@ -246,11 +254,12 @@ def save_test_info_to_csv(
         recall = recall_score(tensor_y_test, y_pred, average=None)
 
         row = [model_number, accuracy] + list(recall)
-        with open(test_info_csv_path, 'a', newline='') as f:
+        with open(test_info_csv_path, "a", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(row)
 
     print(f"Test information saved to '{test_info_csv_path}'.")
+
 
 # --------------- #
 #  Plot Functions #
@@ -266,13 +275,13 @@ def plot_loss_acc(training_info_csv_path: str = None, fig_save_path: str = None)
 
     # Set default CSV file path if not provided
     if training_info_csv_path is None:
-        if not hasattr(cf, 'training_info_path') or cf.training_info_path is None:
+        if not hasattr(cf, "training_info_path") or cf.training_info_path is None:
             raise ValueError("The 'training_info_path' is not set.")
         training_info_csv_path = os.path.join(cf.training_info_path, "training_information", "training_history.csv")
 
     # Set default figure save path if not provided
     if fig_save_path is None:
-        if not hasattr(cf, 'training_info_path') or cf.training_info_path is None:
+        if not hasattr(cf, "training_info_path") or cf.training_info_path is None:
             raise ValueError("The 'training_info_path' is not set.")
         fig_save_path = os.path.join(cf.training_info_path, "figures", "training_history.svg")
 
@@ -282,61 +291,60 @@ def plot_loss_acc(training_info_csv_path: str = None, fig_save_path: str = None)
 
     data = pd.read_csv(training_info_csv_path)
 
-    loss = data['loss']
-    accuracy = data['accuracy']
-    val_loss = data['val_loss']
-    val_accuracy = data['val_accuracy']
+    loss = data["loss"]
+    accuracy = data["accuracy"]
+    val_loss = data["val_loss"]
+    val_accuracy = data["val_accuracy"]
 
     plt.figure(figsize=(12, 4))
 
     # Plot training and validation accuracy
     plt.subplot(1, 2, 1)
-    plt.plot(accuracy, label='Train Accuracy')
-    plt.plot(val_accuracy, label='Validation Accuracy')
-    plt.title('Model Accuracy')
-    plt.xlabel('Epoch')
-    plt.ylabel('Accuracy')
-    plt.legend(loc='upper left')
+    plt.plot(accuracy, label="Train Accuracy")
+    plt.plot(val_accuracy, label="Validation Accuracy")
+    plt.title("Model Accuracy")
+    plt.xlabel("Epoch")
+    plt.ylabel("Accuracy")
+    plt.legend(loc="upper left")
 
     # Plot training and validation loss
     plt.subplot(1, 2, 2)
-    plt.plot(loss, label='Train Loss')
-    plt.plot(val_loss, label='Validation Loss')
-    plt.title('Model Loss')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.legend(loc='upper left')
+    plt.plot(loss, label="Train Loss")
+    plt.plot(val_loss, label="Validation Loss")
+    plt.title("Model Loss")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.legend(loc="upper left")
 
     os.makedirs(os.path.dirname(fig_save_path), exist_ok=True)
-    plt.savefig(fig_save_path, format='svg')
+    plt.savefig(fig_save_path, format="svg")
     plt.close()
+
 
 def plot_confusion_matrix(data_test_path: str = None, model_path: str = None, fig_save_path: str = None) -> None:
     if data_test_path is None:
-        if hasattr(cf, 'data_path') and cf.data_path is not None:
+        if hasattr(cf, "data_path") and cf.data_path is not None:
             data_test_path = os.path.join(cf.data_path, "processed_data", "data_contact_test.tfrecord")
         else:
             raise ValueError("The 'data_path' is not set.")
 
     if model_path is None:
-        if hasattr(cf, 'model_path') and cf.model_path is not None:
+        if hasattr(cf, "model_path") and cf.model_path is not None:
             model_path = cf.model_path
         else:
             raise ValueError("The 'model_path' is not set in either the argument or the configuration.")
 
     if fig_save_path is None:
-        if hasattr(cf, 'training_info_path') and cf.training_info_path is not None:
+        if hasattr(cf, "training_info_path") and cf.training_info_path is not None:
             fig_save_path = os.path.join(cf.training_info_path, "figures")
         else:
             raise ValueError("The 'fig_save_path' is not set.")
 
     fig_save_path = generate_unique_file_path(
-        base_filename="confusion_matrix",
-        file_save_path=fig_save_path,
-        extension= ".svg"
+        base_filename="confusion_matrix", file_save_path=fig_save_path, extension=".svg"
     )
 
-    print("fig_save_path:",fig_save_path)
+    print("fig_save_path:", fig_save_path)
 
     cf.model.load_weights(model_path)
 
@@ -360,42 +368,46 @@ def plot_confusion_matrix(data_test_path: str = None, model_path: str = None, fi
 
     plt.figure(figsize=(15, 12))
     sns.heatmap(cm_perc, annot=annot, cmap="YlGnBu", fmt="", linewidths=1, square=True, annot_kws={"fontsize": 12})
-    plt.xlabel('Predicted label', fontsize=14)
-    plt.ylabel('True label', fontsize=14)
-    plt.title(f'Accuracy: {accuracy * 100:.2f}%', fontsize=16)
+    plt.xlabel("Predicted label", fontsize=14)
+    plt.ylabel("True label", fontsize=14)
+    plt.title(f"Accuracy: {accuracy * 100:.2f}%", fontsize=16)
 
-    plt.savefig(fig_save_path, format='svg')
+    plt.savefig(fig_save_path, format="svg")
     plt.close()
+
 
 # ---------------- #
 #  Train Functions #
 # ---------------- #
 
-def one_model_train():
 
+def one_model_train(model_name: str = None):
     if cf.training_info_path is None:
-        raise ValueError("The 'training_info_path' is not set.")
+        warnings.warn("The 'training_info_path' is not set.", UserWarning)
+        cf.training_info_path = make_train_folder(model_name=model_name)
+        print("training_info_path was set to ", cf.training_info_path)
 
-    print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))
+    print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices("GPU")))
 
     x_val, y_val, *unused = load_tfrecord_to_list(cf.data_path + "processed_data/data_contact_val.tfrecord")
     x_train, y_train, *unused = load_tfrecord_to_list(cf.data_path + "processed_data/data_contact_train.tfrecord")
 
-    train_dataset = tf.data.Dataset.from_tensor_slices((x_train,y_train)).shuffle(len(x_train)).batch(32)
-    val_dataset = tf.data.Dataset.from_tensor_slices((x_val,y_val)).batch(16)
+    train_dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(len(x_train)).batch(32)
+    val_dataset = tf.data.Dataset.from_tensor_slices((x_val, y_val)).batch(16)
 
-    model_save_path = cf.training_info_path + f'models/model_' + '{epoch:02d}.keras'
-    save_model_path_callback=SaveModelPathCallback(model_save_path)
+    model_save_path = cf.training_info_path + f"models/model_" + "{epoch:02d}.keras"
+    save_model_path_callback = SaveModelPathCallback(model_save_path)
     model_checkpoint = tf.keras.callbacks.ModelCheckpoint(
-        filepath=model_save_path,
-        save_weights_only=False,
-        save_best_only=False,
-        verbose=1
+        filepath=model_save_path, save_weights_only=False, save_best_only=False, verbose=1
     )
     cf.start_train_time = time.time()
 
-    history = cf.model.fit(train_dataset, validation_data=val_dataset, epochs=cf.epochs,
-                        callbacks=[model_checkpoint,save_model_path_callback])
+    history = cf.model.fit(
+        train_dataset,
+        validation_data=val_dataset,
+        epochs=cf.epochs,
+        callbacks=[model_checkpoint, save_model_path_callback],
+    )
 
     cf.end_train_time = time.time()
 
@@ -407,6 +419,7 @@ def one_model_train():
 
     save_test_info_to_csv()
 
+
 def k_fold_cross_validation(k):
     model_list = ["tccnn", "cnn", "bilstm", "cnn-bilstm"]
 
@@ -416,12 +429,14 @@ def k_fold_cross_validation(k):
         "tccnn": tccnn_model_creat,
         "cnn": cnn_mode_creat,
     }
-    for k_step in range(1,k+1):
-        cf.train_nums,cf.test_nums,cf.val_nums,_ = split_data(cf.turn_read_sum, cf.train_num, cf.test_num, cf.val_num)
+    for k_step in range(1, k + 1):
+        cf.train_nums, cf.test_nums, cf.val_nums, _ = split_data(
+            cf.turn_read_sum, cf.train_num, cf.test_num, cf.val_num
+        )
         database_create()
         tfrecord_connect()
         for model_name in model_list:
-            cf.training_info_path = make_train_folder(k=k_step,model_name=model_name)
+            cf.training_info_path = make_train_folder(k=k_step, model_name=model_name)
             model_function = model_function_map.get(model_name)
             if model_function:
                 cf.model = model_function()
@@ -429,6 +444,7 @@ def k_fold_cross_validation(k):
                 one_model_train()
             else:
                 print(f"Function for {model_name} not found.")
+
 
 def all_models_confusion_matrix(training_info_path) -> None:
 
@@ -439,4 +455,4 @@ def all_models_confusion_matrix(training_info_path) -> None:
 
     for model in models_list:
         model_path = os.path.join(models_folder_path, model)
-        plot_confusion_matrix(model_path=model_path,fig_save_path=fig_save_path)
+        plot_confusion_matrix(model_path=model_path, fig_save_path=fig_save_path)

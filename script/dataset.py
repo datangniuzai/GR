@@ -70,7 +70,6 @@ def tfrecord_establish(df: np.ndarray, gesture_number: int, dataset_type: str):
             window_data_labels.extend(l)
 
     window_data_feature_tensor = tf.convert_to_tensor(window_data_features, dtype=tf.float32)
-    print(window_data_feature_tensor)
     label_tensor = tf.convert_to_tensor(window_data_labels, dtype=tf.uint8)
 
     dataset = tf.data.Dataset.from_tensor_slices((window_data_feature_tensor, label_tensor))

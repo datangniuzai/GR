@@ -206,3 +206,57 @@ def ld(data: np.ndarray, epsilon: float = 1e-9) -> np.ndarray:
     Log Detector (LD): Computes the log-energy-based feature.
     """
     return np.exp(np.mean(np.log(np.abs(data) + epsilon), axis=0))
+
+
+def min_max_normalize(feature_vector: np.ndarray) -> np.ndarray:
+    """Min-Max 归一化"""
+    min_val = np.min(feature_vector)
+    max_val = np.max(feature_vector)
+    return (feature_vector - min_val) / (max_val - min_val + 1e-9)
+
+if __name__ == '__main__':
+
+    np.random.seed(42)
+    data = np.random.randn(1000, 3)
+
+    # 计算所有特征
+    features = {
+        "MAV": mav(data),
+        "SD": sd(data),
+        "VAR": var(data),
+        "RMS": rms(data),
+        "MAD": mad(data),
+        "IQR": iqr(data),
+        "KURT": kurt(data),
+        "SKEW": skew(data),
+        "COV": cov(data),
+        "AAC": aac(data),
+        "DASDV": dasdv(data),
+        "DVARV": dvarv(data),
+        "MMAV": mmav(data),
+        "MMAV2": mmav2(data),
+        "IEMG": iemg(data),
+        "WAMP": wamp(data),
+        "ZC": zc(data),
+        "SSC": ssc(data),
+        "SSI": ssi(data),
+        "AE": ae(data),
+        "MSE": mse(data),
+        "VO (order=3)": vo(data, order=3),
+        "WL": wl(data),
+        "LTKEO": ltkeo(data),
+        "LD": ld(data),
+        "MVAR (order=0)": mvar(data, order=0)
+    }
+
+    # 归一化所有特征向量
+    normalized_features = {}
+    for feature_name, feature_vector in features.items():
+        normalized_features[feature_name] = min_max_normalize(feature_vector)
+        # normalized_features[feature_name] = z_score_normalize(feature_vector)
+
+
+    # 打印归一化后的特征
+    for feature_name, normalized_vector in normalized_features.items():
+        print(f"{feature_name} (Normalized):", normalized_vector)
+

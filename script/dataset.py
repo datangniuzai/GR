@@ -130,7 +130,7 @@ def primary_windows(data: np.ndarray, secondary_window_size: int, secondary_step
     strided_strides = (secondary_step_size * data.strides[0], data.strides[0], data.strides[1])
     windows = as_strided(data, shape=strided_shape, strides=strided_strides)
 
-    primary_window_feature = min_max_normalize_per_feature(np.apply_along_axis(secondary_features, 1, windows))
+    primary_window_feature = z_score_normalize_per_timestep(np.apply_along_axis(secondary_features, 1, windows))
 
     return primary_window_feature
 
@@ -397,5 +397,6 @@ def load_tfrecord_data_label(tfrecord_path: str) -> Tuple[tf.Tensor, tf.Tensor]:
 
     return window_datas, labels
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     cf.config_read()

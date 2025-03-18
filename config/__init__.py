@@ -48,8 +48,6 @@ step_size_little    = None        # 小窗口步长
 
 epochs              = None        # 网络循环次数
 
-scaling             = None        # 数据缩放系数
-
 start_train_time    = None        # 模型训练开始的时间
 end_train_time      = None        # 模型训练结束的时间
 
@@ -114,7 +112,7 @@ def config_read():
 
     elif set_pattern == '2':
         # data process
-        global window_size, step_size, window_size_little, step_size_little, epochs, scaling, model_name
+        global window_size, step_size, window_size_little, step_size_little, epochs, model_name
         global train_num, val_num, test_num, train_nums, val_nums, test_nums, feature_shape
 
         # data process parameters
@@ -127,8 +125,6 @@ def config_read():
 
         window_size_little = dpp['window_size_little']
         step_size_little = dpp['step_size_little']
-
-        scaling = dpp['scaling']
 
         feature_shape = dpp['feature_shape']
 
@@ -191,7 +187,6 @@ def config_read():
         print("|     二级窗口大小    |", window_size_little)
         print("|     二级窗口步长    |", step_size_little)
         print("|     模型迭代次数    |", epochs)
-        print("|     数据缩放系数    |", scaling)
         print("|     训练集的位置    |", train_nums)
         print("|     验证集的位置    |", val_nums)
         print("|     测试集的位置    |", test_nums)

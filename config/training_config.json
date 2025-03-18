@@ -16,7 +16,6 @@
     "step_size": 100,
     "window_size_little": 200,
     "step_size_little": 40,
-    "scaling": 200,
     "feature_shape": [6,5,64],
     "specify_data_set_mode": {
       "train_nums": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,12],

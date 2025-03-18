@@ -158,7 +158,6 @@ def save_train_config() -> None:
         file.write(f"Secondary  window size: {cf.window_size_little}\n")
         file.write(f"Secondary  window step size: {cf.step_size_little}\n")
         file.write(f"Epochs: {cf.epochs}\n")
-        file.write(f"Scaling factor: {cf.scaling}\n")
         file.write(f"Model: {cf.model_name}\n")
 
     print(f"Total training time: {train_duration_minutes:.2f} minutes")

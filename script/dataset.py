@@ -107,13 +107,13 @@ def process_read_time(args):
     for j in range(0, single_acquire_data.shape[0] - window_size + 1, step_size):
         window_data = single_acquire_data[j : j + window_size, :]
         window_data = bandpass_and_notch_filter(window_data)
-        features.append(primary_windows(window_data, secondary_window_size, secondary_step_size))
+        features.append(primary_window_feature(window_data, secondary_window_size, secondary_step_size))
         labels.append(gesture_number - 1)
 
     return features, labels
 
 
-def primary_windows(data: np.ndarray, secondary_window_size: int, secondary_step_size: int) -> np.ndarray:
+def primary_window_feature(data: np.ndarray, secondary_window_size: int, secondary_step_size: int) -> np.ndarray:
     """
     Efficiently split the input data into primary sliding windows.
 
@@ -130,12 +130,12 @@ def primary_windows(data: np.ndarray, secondary_window_size: int, secondary_step
     strided_strides = (secondary_step_size * data.strides[0], data.strides[0], data.strides[1])
     windows = as_strided(data, shape=strided_shape, strides=strided_strides)
 
-    primary_window_feature = z_score_normalize_per_timestep(np.apply_along_axis(secondary_features, 1, windows))
+    features = z_score_normalize_per_timestep(np.apply_along_axis(secondary_window_feature, 1, windows))
 
-    return primary_window_feature
+    return features
 
 
-def secondary_features(data: np.ndarray) -> np.ndarray:
+def secondary_window_feature(data: np.ndarray) -> np.ndarray:
     """
     extract the features from primary windowed_data.
 

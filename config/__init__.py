@@ -9,6 +9,7 @@ import datetime
 import json
 import os
 import random
+from pathlib import Path
 from typing import List, Tuple
 
 # configs
@@ -246,6 +247,19 @@ def split_data(_turn_read_sum: int, _train_num: int, _test_num: int, _val_num: i
     _remaining_numbers = [num for num in _remaining_numbers if num not in _val_nums]
 
     return _train_nums, _test_nums, _val_nums, _remaining_numbers
+
+def find_project_root(start_path=None):
+    if start_path is None:
+        start_path = Path(__file__).resolve()
+
+    while start_path != start_path.parent:
+        if (start_path / 'README.md').exists():
+            return start_path
+        start_path = start_path.parent
+
+    raise FileNotFoundError("Project root directory not found. "
+                            "Please ensure the current directory contains a README.md file, "
+                            "or modify the root directory search criteria as needed.")
 
 
 if __name__ == '__main__':

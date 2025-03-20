@@ -9,7 +9,7 @@ from typing import Union,List
 import warnings
 
 from robots.robot_hand import RobotHand
-from script.online_show_sub import GestureSubscriberBase
+from online.online_show_base import GestureSubscriberBase
 
 
 class RobotHandControl(GestureSubscriberBase):

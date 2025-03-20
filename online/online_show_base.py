@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Time : 2025/3/19 11:31
 # @Author : Jason.LI
-# @File : online_show_sub.py
+# @File : online_show_base.py
 # @Software: PyCharm
 
 import zmq

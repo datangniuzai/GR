@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Time : 2025/3/6 11:34
 # @Author : Jason.LI
-# @File : online_show_pub.py
+# @File : online_gesture_pub.py
 # @Software: PyCharm
 
 import os
@@ -12,14 +12,15 @@ import logging
 import datetime
 from multiprocessing import Queue
 
+import zmq
 import numpy as np
 import tensorflow as tf
-import zmq
 
 import config as cf
-from filtering import bandpass_and_notch_filter
+from gesture_recognition.script.filtering import bandpass_and_notch_filter
 from model_file import tccnn_model_creat
-from dataset import primary_window_feature
+from gesture_recognition.script.dataset import primary_window_feature
+from gesture_recognition.script.dataset import primary_window_feature
 
 os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 

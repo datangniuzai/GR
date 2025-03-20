@@ -24,7 +24,7 @@ from sklearn.metrics import accuracy_score, confusion_matrix, recall_score
 import config as cf
 from config import split_data
 from dataset import load_tfrecord_to_list, load_tfrecord_data_label, database_create, tfrecord_connect
-from model_file import tccnn_model_creat, cnn_mode_creat, bilstm_model_creat, cnn_bilstm_model_creat
+from model_file import litestfnet_model_creat, cnn_mode_creat, bilstm_model_creat, cnn_bilstm_model_creat
 
 
 class SaveModelPathCallback(tf.keras.callbacks.Callback):
@@ -420,12 +420,12 @@ def one_model_train(model_name: str = None):
 
 
 def k_fold_cross_validation(k):
-    model_list = ["tccnn", "cnn", "bilstm", "cnn-bilstm"]
+    model_list = ["litestfnet", "cnn", "bilstm", "cnn-bilstm"]
 
     model_function_map = {
         "bilstm": bilstm_model_creat,
         "cnn-bilstm": cnn_bilstm_model_creat,
-        "tccnn": tccnn_model_creat,
+        "litestfnet": litestfnet_model_creat,
         "cnn": cnn_mode_creat,
     }
     for k_step in range(1, k + 1):

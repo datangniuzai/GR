@@ -12,7 +12,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QPixmap
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QPushButton,QHBoxLayout
 
-from script.online_show_sub import GestureSubscriberBase
+from online.online_show_base import GestureSubscriberBase
 from config import find_project_root
 
 class GestureDisplaySubscriber(GestureSubscriberBase):
@@ -42,14 +42,18 @@ class GestureDisplaySubscriber(GestureSubscriberBase):
                 16: {"name": "gesture16", "image": "data/gesture_pictures/gesture16.png"},
                 17: {"name": "gesture17", "image": "data/gesture_pictures/gesture17.png"}
             }
+
         self.project_root  = find_project_root()
 
         self.quit_button = None
         self.gesture_label = None
         self.image_label = None
         self.layout = None
+
         self.app = QApplication(sys.argv)
+
         self.window = QWidget()
+
         self.init_ui()
 
     def init_ui(self):
@@ -144,7 +148,6 @@ class GestureDisplaySubscriber(GestureSubscriberBase):
             self.image_label.setPixmap(pixmap)
 
         self.app.processEvents()
-
 
 
 if __name__ == "__main__":

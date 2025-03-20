@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Time : 2024/02/01 19:43
 # @Author : Jason.LI
-# @File : build_model.py
+# @File : litestfnet.py
 # @Software: PyCharm
 
 from typing import Tuple
@@ -73,8 +73,8 @@ class ChannelSelector(Layer):
         })
         return config
 
-@register_keras_serializable(package="Custom", name="TCCNN")
-class TCCNNLayer(Layer):
+@register_keras_serializable(package="Custom", name="LiteSTFNet")
+class LiteSTFNetLayer(Layer):
     """
     Calculating new features by fusing adjacent time steps.
     --------
@@ -92,7 +92,7 @@ class TCCNNLayer(Layer):
         dropout_rate: float = 0.3,
         **kwargs
     ):
-        super(TCCNNLayer, self).__init__(**kwargs)
+        super(LiteSTFNetLayer, self).__init__(**kwargs)
 
         self.filters = filters
         self.kernel_size = kernel_size
@@ -113,13 +113,13 @@ class TCCNNLayer(Layer):
     def call(
         self,
         outer_input: tf.Tensor,
-        first_tccnn_layer: bool = False,
-        last_tccnn_layer: bool = False
+        first_litestfnet_layer: bool = False,
+        last_litestfnet_layer: bool = False
     ) -> tf.Tensor:
         """
-        Forward pass of the TCCNN layer.
+        Forward pass of the litestfnet layer.
         """
-        if first_tccnn_layer:
+        if first_litestfnet_layer:
             outer_input = self.circular_padding(outer_input)
 
         conv_input = tf.expand_dims(outer_input, axis=-1)
@@ -135,7 +135,7 @@ class TCCNNLayer(Layer):
         if self.dropout_rate > 0:
             temp_output = self.dropout(temp_output)
 
-        if last_tccnn_layer:
+        if last_litestfnet_layer:
             outputs = tf.reduce_mean(temp_output, axis=1)
         else:
             outputs = tf.transpose(temp_output, [0, 1, 3, 2])
@@ -164,7 +164,7 @@ class TCCNNLayer(Layer):
         """
         Returns the config dictionary for the custom layer.
         """
-        config = super(TCCNNLayer, self).get_config()
+        config = super(LiteSTFNetLayer, self).get_config()
         config.update({
             'filters': self.filters,
             'kernel_size': self.kernel_size,
@@ -175,17 +175,17 @@ class TCCNNLayer(Layer):
         })
         return config
 
-def tccnn_model_creat():
+def litestfnet_model_creat():
 
-    cf.model_name = "TCCNN"
+    cf.model_name = "LiteSTFNet"
 
     input_layer = Input(shape=cf.feature_shape, name='input_layer')
 
-    tccnn_1 = (TCCNNLayer(filters=10, kernel_size=(5, 5), name='tccnn_1', dropout_rate=0.3)
-               (input_layer,first_tccnn_layer=True,last_tccnn_layer=False))
-    tccnn_2 = (TCCNNLayer(filters=20, kernel_size=(10, 5), name='tccnn_2', dropout_rate=0.2)
-               (tccnn_1,first_tccnn_layer=False,last_tccnn_layer=True))
-    flatten_1 = Flatten(name='flatten_1')(tccnn_2)
+    litestfnet_1 = (LiteSTFNetLayer(filters=10, kernel_size=(5, 5), name='litestfnet_1', dropout_rate=0.3)
+               (input_layer,first_litestfnet_layer=True,last_litestfnet_layer=False))
+    litestfnet_2 = (LiteSTFNetLayer(filters=20, kernel_size=(10, 5), name='litestfnet_2', dropout_rate=0.2)
+               (litestfnet_1,first_litestfnet_layer=False,last_litestfnet_layer=True))
+    flatten_1 = Flatten(name='flatten_1')(litestfnet_2)
 
     dense1 = tf.keras.layers.Dense(units=120, activation='relu', name='dense_last')(flatten_1)
 
@@ -294,17 +294,17 @@ def cnn_bilstm_model_creat():
 # ---------------- #
 #  Ablation Study  #
 # ---------------- #
-def tccnn_mode_creat_ablation_study():
-    cf.model_name = "TCCNN"
+def litestfnet_mode_creat_ablation_study():
+    cf.model_name = "LiteSTFNet"
 
     input_layer = Input(shape=cf.feature_shape, name='input_layer')
 
-    tccnn_1 = (TCCNNLayer(filters=10, kernel_size=(5, 5), name='tccnn_1', dropout_rate=0.3)
-               (input_layer, first_tccnn_layer=False, last_tccnn_layer=False))
-    tccnn_2 = (TCCNNLayer(filters=20, kernel_size=(10, 5), name='tccnn_2', dropout_rate=0.2)
-               (tccnn_1, first_tccnn_layer=False, last_tccnn_layer=False))
+    litestfnet_1 = (LiteSTFNetLayer(filters=10, kernel_size=(5, 5), name='litestfnet_1', dropout_rate=0.3)
+               (input_layer, first_litestfnet_layer=False, last_litestfnet_layer=False))
+    litestfnet_2 = (LiteSTFNetLayer(filters=20, kernel_size=(10, 5), name='litestfnet_2', dropout_rate=0.2)
+               (litestfnet_1, first_litestfnet_layer=False, last_litestfnet_layer=False))
 
-    flatten_1 = Flatten(name='flatten_1')(tccnn_2)
+    flatten_1 = Flatten(name='flatten_1')(litestfnet_2)
 
     dense1 = tf.keras.layers.Dense(units=120, activation='relu', name='dense_last')(flatten_1)
 

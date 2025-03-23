@@ -15,8 +15,8 @@ from numpy.lib.stride_tricks import as_strided
 from concurrent.futures import ProcessPoolExecutor
 
 import config as cf
-from filtering import bandpass_and_notch_filter
-from calculate_features import mav, mse, zc, wamp, rms
+from gesture_recognition.script.filtering import bandpass_and_notch_filter
+from gesture_recognition.script.calculate_features import mav, mse, zc, wamp, rms
 
 # ------------------------------ #
 #   Feature Extraction Function  #

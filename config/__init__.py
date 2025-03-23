@@ -12,6 +12,9 @@ import random
 from pathlib import Path
 from typing import List, Tuple
 
+from gesture_recognition.script.data_reading import sEMG_data_read_save
+
+
 # configs
 num_channels        = 64          # 通道数
 sample_rate         = 2000        # 采样率
@@ -81,6 +84,9 @@ def config_read():
 
     global action_rest, gesture_rest
 
+    project_root = find_project_root()
+    os.chdir(project_root)
+
     with open('config/training_config.json', 'r', encoding='utf-8') as f:
         config = json.load(f)
 
@@ -110,6 +116,8 @@ def config_read():
         print("|     手势重复次数    |", turn_read_sum)
         print("|     动作之间休息    |", action_rest,"(s)")
         print("|     手势之间休息    |", gesture_rest,"(s)")
+
+        sEMG_data_read_save()
 
     elif set_pattern == '2':
         # data process
@@ -260,6 +268,7 @@ def find_project_root(start_path=None):
     raise FileNotFoundError("Project root directory not found. "
                             "Please ensure the current directory contains a README.md file, "
                             "or modify the root directory search criteria as needed.")
+
 
 
 if __name__ == '__main__':

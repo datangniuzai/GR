@@ -64,7 +64,7 @@ def sEMG_data_read_save():
                 # Save data to file
                 with open(cf.data_path + f'original_data/sEMG_data{gesture_number}.csv', 'a') as f:
                     np.savetxt(f, output_data[cf.sample_rate:, :] * 0.195, delimiter=',', fmt='%.6f')
-
+                time.sleep(0.5)
                 text_to_speak = "Please rest."
                 print(text_to_speak)
                 engine.say(text_to_speak)
@@ -72,7 +72,7 @@ def sEMG_data_read_save():
                 time.sleep(15)
 
             i += 1
-            time.sleep(180)
+            time.sleep(25)
 
     finally:
         end_time = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
@@ -130,4 +130,8 @@ def generate_volunteer_experiment_info(start_time,end_time):
 
     print(f"实验记录数据已保存至: {file_name}")
 
+if __name__ == '__main__':
 
+    print(cf.find_project_root())
+    cf.config_read()
+    sEMG_data_read_save()

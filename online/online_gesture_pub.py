@@ -5,38 +5,24 @@
 # @File : online_gesture_pub.py
 # @Software: PyCharm
 
-import os
-import threading
-import socket
-import logging
 import datetime
+import logging
+import os
+import socket
+import threading
 from multiprocessing import Queue
 
-import zmq
 import numpy as np
 import tensorflow as tf
+import zmq
 
 import config as cf
+from gesture_recognition.script.dataset import primary_window_feature
 from gesture_recognition.script.filtering import bandpass_and_notch_filter
-from model_file import tccnn_model_creat
-from gesture_recognition.script.dataset import primary_window_feature
-from gesture_recognition.script.dataset import primary_window_feature
-
-os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-
-log_file_path = f"logs/online_show_{datetime.datetime.now().strftime('%m-%d_%H-%M')}.log"
-
-if not os.path.exists(os.path.dirname(log_file_path)):
-    os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[logging.FileHandler(log_file_path), logging.StreamHandler()],
-)
+from model_file import litestfnet_model_creat
 
 
-def original_data_receiver(data_queue: Queue[np.ndarray], window_size: int, port: int = 8080) -> None:
+def original_data_receiver(data_queue: Queue, window_size: int, port: int = 8080) -> None:
     """
     Receives UDP packets, processes sEMG data, and stores it in a queue.
 
@@ -61,6 +47,11 @@ def original_data_receiver(data_queue: Queue[np.ndarray], window_size: int, port
             idx += 10
 
             if idx == window_size:
+
+                # Save data to file
+                # with open(cf.data_path + f'original_data/origin_data.csv', 'a') as f:
+                #     np.savetxt(f, output_data, delimiter=',', fmt='%.6f')
+
                 data_queue.put(output_data[:])
                 idx = 0
 
@@ -72,9 +63,7 @@ def original_data_receiver(data_queue: Queue[np.ndarray], window_size: int, port
         logging.info("UDP socket closed")
 
 
-def model_predictor(
-    data_queue: Queue[np.ndarray], path_model: str, window_size_little: int, step_size_little: int
-) -> None:
+def model_predictor(data_queue, path_model, window_size_little, step_size_little) -> None:
     """
     A function to predict gestures from data in a queue using a pre-trained model.
 
@@ -88,7 +77,7 @@ def model_predictor(
     zmq_socket = context.socket(zmq.PUB)
     zmq_socket.bind("tcp://*:5555")
 
-    model = tccnn_model_creat()
+    model = litestfnet_model_creat()
     model.load_weights(path_model)
     logging.info("Model loaded successfully")
     logging.info("Prediction start")
@@ -105,10 +94,11 @@ def model_predictor(
                     ),
                     axis=0,
                 )
-
                 predicted_class_index = np.argmax(model.predict(window_data_feature), axis=1)
-                gesture = int(predicted_class_index[0])
+                gesture = int(predicted_class_index[0]) + 1
+
                 zmq_socket.send_string(str(gesture))
+
                 logging.info(f"Predicted gesture: {gesture}")
 
         except Exception as e:
@@ -116,12 +106,24 @@ def model_predictor(
             continue
 
 
-if __name__ != "__main__":
+if __name__ == "__main__":
     cf.config_read()
+
+    log_file_path = f"logs/online_show_{datetime.datetime.now().strftime('%m-%d_%H-%M')}.log"
+
+    if not os.path.exists(os.path.dirname(log_file_path)):
+        os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        handlers=[logging.FileHandler(log_file_path), logging.StreamHandler()],
+    )
 
     sEMG_data_queue = Queue()
     # 🔥change the model path here！🔥
-    model_path = "data/240909-LJX-Man-S-17/all_train_info/tccnn_fold1_03-03_21-35/models/model_03.keras"
+    model_path = "data/online_data_test/all_train_info/LiteSTFNet_03-22_20-29/models/model_30.keras"
+
 
     receiver_thread = threading.Thread(
         target=original_data_receiver, args=(sEMG_data_queue, cf.window_size)

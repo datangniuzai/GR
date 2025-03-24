@@ -19,7 +19,7 @@ import zmq
 import config as cf
 from gesture_recognition.script.dataset import primary_window_feature
 from gesture_recognition.script.filtering import bandpass_and_notch_filter
-from model_file import litestfnet_model_creat
+from models.LiteSTFNet.litestfnet import litestfnet_model_creat
 
 
 def original_data_receiver(data_queue: Queue, window_size: int, port: int = 8080) -> None:

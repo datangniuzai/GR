@@ -24,7 +24,7 @@ from sklearn.metrics import accuracy_score, confusion_matrix, recall_score
 import config as cf
 from config import split_data
 from dataset import load_tfrecord_to_list, load_tfrecord_data_label, database_create, tfrecord_connect
-from model_file import litestfnet_model_creat, cnn_mode_creat, bilstm_model_creat, cnn_bilstm_model_creat
+from models.LiteSTFNet.litestfnet import litestfnet_model_creat, cnn_mode_creat, bilstm_model_creat, cnn_bilstm_model_creat
 
 
 class SaveModelPathCallback(tf.keras.callbacks.Callback):

@@ -12,7 +12,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QPixmap
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QPushButton,QHBoxLayout
 
-from online.online_show_base import GestureSubscriberBase
+from online.online_demo_sub_base import GestureSubscriberBase
 from config import find_project_root
 
 class GestureDisplaySubscriber(GestureSubscriberBase):

@@ -8,8 +8,8 @@
 from typing import Union,List
 import warnings
 
-from robots.robot_hand import RobotHand
-from online.online_show_base import GestureSubscriberBase
+from online.controlled_object.robot_hand import RobotHand
+from online.online_demo_sub_base import GestureSubscriberBase
 
 
 class RobotHandControl(GestureSubscriberBase):

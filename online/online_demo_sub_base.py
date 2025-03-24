@@ -2,12 +2,12 @@
 # -*- coding: utf-8 -*-
 # @Time : 2025/3/19 11:31
 # @Author : Jason.LI
-# @File : online_show_base.py
+# @File : online_demo_sub_base.py
 # @Software: PyCharm
 
 import zmq
 from abc import ABC, abstractmethod
-from typing import Union, List
+from typing import Union
 
 
 class GestureSubscriberBase(ABC):

@@ -12,7 +12,7 @@ import random
 from pathlib import Path
 from typing import List, Tuple
 
-from gesture_recognition.script.data_reading import sEMG_data_read_save
+from recording.data_save_offline import sEMG_data_save_offline
 
 
 # configs
@@ -117,7 +117,7 @@ def config_read():
         print("|     动作之间休息    |", action_rest,"(s)")
         print("|     手势之间休息    |", gesture_rest,"(s)")
 
-        sEMG_data_read_save()
+        sEMG_data_save_offline()
 
     elif set_pattern == '2':
         # data process

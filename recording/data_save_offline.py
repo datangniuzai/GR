@@ -1,23 +1,74 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# @Time : 2024/11/14 19:43
+# @Time : 2025/3/24 19:58
 # @Author : Jason.LI
-# @File : filtering.py
+# @File : data_save_offline.py
 # @Software: PyCharm
 
+import logging
+from typing import List
 import os
 import json
 import time
 import socket
 import pyttsx3
 import datetime
-import numpy as np
 import struct
+import numpy as np
+from multiprocessing import Queue
 
 import config as cf
+from config import action_rest
 
 
-def sEMG_data_read_save():
+def generate_volunteer_experiment_info(start_time,end_time):
+
+    experiment_info = {
+        "name": "volunteer_experiment_info",
+        "description": "Details of subjects and experimental process",
+        "detailed description": "",
+        "note": "The following description of time is in hours.",
+        "explanation about identifier": "date/subject's_last_name/man_or_female/static_or_dynamic/number_of_gestures",
+        "identifier": "250112-Z-Man-S-26",
+        "volunteer_info": {
+            "name": "",
+            "age": "",
+            "gender": "male/female",
+            "measured_arm": "left/right",
+            "diet": "Normal",
+            "weekly_exercise_duration": 3.5,
+            "subject_conditions": {
+                "neurological_diseases": "None",
+                "physical_conditions": "Healthy",
+                "sleep": {
+                    "previous_night_sleep_duration": 7.5,
+                    "bedtime": "2024-11-17T23:00:00"
+                },
+                "diet": "Normal",
+                "weekly_exercise_duration": 3.5
+            }
+        },
+        "experiment_info": {
+            "gesture_sequence": cf.gesture,
+            "collector_number": cf.collector_number - 8079,
+            "gesture_read_count_per_instance":cf.turn_read_sum,
+            "read_duration_per_instance": cf.time_preread,
+            "experiment_time": {
+                "start_time": start_time,
+                "end_time": end_time,
+                "gesture_rest": cf.gesture_rest,
+                "action_rest":cf.action_rest
+            }
+        }
+    }
+    file_name = os.path.join(cf.data_path, "vol_exp_info.json")
+    with open(file_name, 'w', encoding='utf-8') as f:
+        json.dump(experiment_info, f, ensure_ascii=False, indent=4)
+
+    print(f"实验记录数据已保存至: {file_name}")
+
+
+def sEMG_data_save_offline():
     """
     Collect and save sEMG data by receiving UDP packets.
 
@@ -29,6 +80,7 @@ def sEMG_data_read_save():
     Returns:
     None
     """
+
     engine = pyttsx3.init()
     rate = engine.getProperty('rate')
     engine.setProperty('rate', rate + 50)  # Increase speech rate
@@ -83,55 +135,3 @@ def sEMG_data_read_save():
 
         print(f"\u2764Please rename the folder [{cf.data_path}] to identifier "
               "and complete the details of the [vol_exp_info.json].")
-
-def generate_volunteer_experiment_info(start_time,end_time):
-
-    experiment_info = {
-        "name": "volunteer_experiment_info",
-        "description": "Details of subjects and experimental process",
-        "detailed description": "",
-        "note": "The following description of time is in hours.",
-        "explanation about identifier": "date/subject's_last_name/man_or_female/static_or_dynamic/number_of_gestures",
-        "identifier": "250112-Z-Man-S-26",
-        "volunteer_info": {
-            "name": "",
-            "age": "",
-            "gender": "male/female",
-            "measured_arm": "left/right",
-            "diet": "Normal",
-            "weekly_exercise_duration": 3.5,
-            "subject_conditions": {
-                "neurological_diseases": "None",
-                "physical_conditions": "Healthy",
-                "sleep": {
-                    "previous_night_sleep_duration": 7.5,
-                    "bedtime": "2024-11-17T23:00:00"
-                },
-                "diet": "Normal",
-                "weekly_exercise_duration": 3.5
-            }
-        },
-        "experiment_info": {
-            "gesture_sequence": cf.gesture,
-            "collector_number": cf.collector_number - 8079,
-            "gesture_read_count_per_instance":cf.turn_read_sum,
-            "read_duration_per_instance": cf.time_preread,
-            "experiment_time": {
-                "start_time": start_time,
-                "end_time": end_time,
-                "gesture_rest": cf.gesture_rest,
-                "action_rest":cf.action_rest
-            }
-        }
-    }
-    file_name = os.path.join(cf.data_path, "vol_exp_info.json")
-    with open(file_name, 'w', encoding='utf-8') as f:
-        json.dump(experiment_info, f, ensure_ascii=False, indent=4)
-
-    print(f"实验记录数据已保存至: {file_name}")
-
-if __name__ == '__main__':
-
-    print(cf.find_project_root())
-    cf.config_read()
-    sEMG_data_read_save()

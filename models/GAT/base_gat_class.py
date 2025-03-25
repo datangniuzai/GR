@@ -7,14 +7,13 @@
 
 from typing import Callable
 
-import numpy as np
 import tensorflow as tf
 from tensorflow.keras.layers import Layer, Dropout, Input, Dense
 from tensorflow.keras.models import Model
 from tensorflow.keras.utils import register_keras_serializable
 
+from adj import build_one_adjacency
 import config as cf
-
 
 @register_keras_serializable(package="Custom", name="SpatioTemporalGAT")
 class SpatioTemporalGAT(Layer):
@@ -236,4 +235,4 @@ def stgat_model_creat(batch_size,input_matrix):
 
 if __name__ == '__main__':
     cf.config_read()
-    stgat_model_creat(batch_size=32, input_matrix=np.ones((5, 5)))
+    stgat_model_creat(batch_size= 32, input_matrix= build_one_adjacency())

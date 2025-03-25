@@ -12,9 +12,6 @@ import random
 from pathlib import Path
 from typing import List, Tuple
 
-from recording.data_save_offline import sEMG_data_save_offline
-
-
 # configs
 num_channels        = 64          # 通道数
 sample_rate         = 2000        # 采样率
@@ -116,8 +113,6 @@ def config_read():
         print("|     手势重复次数    |", turn_read_sum)
         print("|     动作之间休息    |", action_rest,"(s)")
         print("|     手势之间休息    |", gesture_rest,"(s)")
-
-        sEMG_data_save_offline()
 
     elif set_pattern == '2':
         # data process

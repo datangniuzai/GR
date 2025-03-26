@@ -14,6 +14,7 @@ from scipy import signal
 
 from base_config.config import GlobalConfig
 
+
 class EMGFilter:
     """
     A professional-grade EMG signal processor implementing:
@@ -167,5 +168,3 @@ if __name__ == '__main__':
 
     filter_used = EMGFilter(sample_rate=cf.sample_rate)
     filter_used.filter_and_save_data(gesture_sequence=cf.gesture_sequence,path_to_use_data=cf.path_to_use_data,times_read_gesture=cf.times_read_gesture,once_read_time=cf.once_read_time)
-
-

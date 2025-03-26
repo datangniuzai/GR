@@ -5,99 +5,161 @@
 # @File : data_save_offline.py
 # @Software: PyCharm
 
-import logging
-from typing import List
-import os
-import json
-import time
-import socket
-import pyttsx3
+
 import datetime
-import struct
+import logging
+import os
+import socket
+import time
+from pathlib import Path
+from typing import List, Union
+
 import numpy as np
-from multiprocessing import Queue
+import pyttsx3
 
-import config as cf
-from config import action_rest
-
-
-def generate_volunteer_experiment_info(start_time,end_time):
-
-    experiment_info = {
-        "name": "volunteer_experiment_info",
-        "description": "Details of subjects and experimental process",
-        "detailed description": "",
-        "note": "The following description of time is in hours.",
-        "explanation about identifier": "date/subject's_last_name/man_or_female/static_or_dynamic/number_of_gestures",
-        "identifier": "250112-Z-Man-S-26",
-        "volunteer_info": {
-            "name": "",
-            "age": "",
-            "gender": "male/female",
-            "measured_arm": "left/right",
-            "diet": "Normal",
-            "weekly_exercise_duration": 3.5,
-            "subject_conditions": {
-                "neurological_diseases": "None",
-                "physical_conditions": "Healthy",
-                "sleep": {
-                    "previous_night_sleep_duration": 7.5,
-                    "bedtime": "2024-11-17T23:00:00"
-                },
-                "diet": "Normal",
-                "weekly_exercise_duration": 3.5
-            }
-        },
-        "experiment_info": {
-            "gesture_sequence": cf.gesture,
-            "collector_number": cf.collector_number - 8079,
-            "gesture_read_count_per_instance":cf.turn_read_sum,
-            "read_duration_per_instance": cf.time_preread,
-            "experiment_time": {
-                "start_time": start_time,
-                "end_time": end_time,
-                "gesture_rest": cf.gesture_rest,
-                "action_rest":cf.action_rest
-            }
-        }
-    }
-    file_name = os.path.join(cf.data_path, "vol_exp_info.json")
-    with open(file_name, 'w', encoding='utf-8') as f:
-        json.dump(experiment_info, f, ensure_ascii=False, indent=4)
-
-    print(f"实验记录数据已保存至: {file_name}")
+from base_config.config import GlobalConfig
 
 
-def sEMG_data_save_offline():
-    """
-    Collect and save sEMG data by receiving UDP packets.
+def create_data_folder(base_root_path: Union[str, Path]) -> str:
+    """Create timestamped data directory structure under specified base path.
 
-    Instructions:
-    1. Configure parameters in the `cf` module (collector_number, gesture, etc.).
-    2. Run the function to start data collection.
-    3. Ensure the UDP socket is properly configured with the correct IP and port.
+    Directory Structure:
+    [base_root_path]/
+    └── data/
+        └── YYYY-MM-DD_HH-MM-SS/
+            ├── processed_data/    # Cleaned/normalized datasets
+            ├── original_data/     # Raw collected data (immutable)
+            ├── picture/           # Visualization outputs (plots/charts)
+            └── all_train_info/    # Training metadata and logs
+
+    Args:
+        base_root_path: Parent directory where 'data' folder will be created
 
     Returns:
-    None
+        str: Relative path from base_root_path to created folder
+             (format: "data/YYYY-MM-DD_HH-MM-SS/")
+    """
+    # Convert Path to string if necessary
+    if isinstance(base_root_path, Path):
+        data_root = os.path.join(str(base_root_path), "data")
+    else:
+        data_root = os.path.join(base_root_path, "data")
+    os.makedirs(data_root, exist_ok=True)
+
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    timestamp_dir = os.path.join(data_root, timestamp)
+
+    # Core directory structure
+    sub_dirs = (
+        "processed_data",  # For processed/cleaned data files
+        "original_data",  # For raw unprocessed data
+        "picture",  # For visualization outputs
+        "all_train_info",  # For training logs and metadata
+    )
+
+    # Create all directories
+    for dir_name in sub_dirs:
+        os.makedirs(os.path.join(timestamp_dir, dir_name), exist_ok=True)
+
+    abs_path = os.path.abspath(timestamp_dir)
+
+    print(f"[System] Experiment directory initialized at:\n{abs_path}")
+    logging.info(f"[System] Experiment directory initialized at:\n{abs_path}")
+
+    return f"data/{timestamp}/"
+
+def write_config_file(
+    gesture_sequence: List,
+    times_read_gesture: int,
+    once_read_time: int,
+    gesture_rest: int,
+    loop_rest: int,
+    data_folder_path: str,
+    start_time: str,
+    end_time: str,
+):
+    content = f'''\
+class DataConfig:
+    """
+    Configuration class for managing hand gesture experiment parameters.
+
+    ⚠️ Volunteer and Data Information:
+    - Name: []
+    - Age: [] years
+    - Gender:  [] /e.g. Male / Female
+    - Measured Arm: [] /e.g. Left / Right
+    - Gesture Rest Duration: [] seconds between gestures
+    - Loop Rest Duration: [] seconds between each full loop of gestures
+    - Diet: [] /e.g.Normal
+    - Weekly Exercise: [] hours
+    - Neurological Diseases: [] /e.g. None
+    - Physical Conditions: [] /e.g. None
+    - Sleep (Before Experiment): [] hours (Bedtime: /e.g.2024-11-17 23:00)
+
+    Data Collection Period:
+        - Data Collection Start Time: {start_time}
+        - Data Collection End Time: {end_time}
+
+    Experiment Details:
+    - Identifier Format: YYYYMMDD-Name-Gender-StaticOrDynamic-GestureCount
+    - Example Identifier: "240909-LJX-Man-S-17"
     """
 
+    def __init__(self):
+        self.gesture_sequence = {gesture_sequence}
+        self.times_read_gesture = {times_read_gesture}
+        self.once_read_time = {once_read_time}
+        self.gesture_rest = {gesture_rest}
+        self.loop_rest = {loop_rest}
+
+    def display_config(self):
+        """
+        Displays the current configuration parameters for the hand gesture experiment.
+        """
+        print("=== Experiment Configuration ===")
+        print(f"Gesture Sequence: {{self.gesture_sequence}}")
+        print(f"Times to Read Each Gesture: {{self.times_read_gesture}}")
+        print(f"Read Duration per Action (seconds): {{self.once_read_time}}")
+        print(f"Gesture Rest Duration (seconds): {{self.gesture_rest}}")
+        print(f"Loop Rest Duration (seconds): {{self.loop_rest}}")
+        print("================================")
+'''
+    file_path = os.path.join(data_folder_path, "data_config.py")
+    with open(file_path, "w", encoding="utf-8") as f:  # 明确指定utf-8编码
+        f.write(content)
+
+    print(f"✅ Data configuration file '{file_path}' has been generated successfully!")
+    logging.info(f"✅ Data configuration file '{file_path}' has been generated successfully!")
+
+
+def sEMG_data_save_offline(
+    collector_number:int,
+    once_read_time:int,
+    sample_rate:int,
+    times_read_gesture:int,
+    gesture_sequence:List,
+    path_to_save_data:str,
+    gesture_rest:int,
+    loop_rest:int,
+):
+
     engine = pyttsx3.init()
-    rate = engine.getProperty('rate')
-    engine.setProperty('rate', rate + 50)  # Increase speech rate
-    # voices = engine.getProperty('voices')
-    # engine.setProperty('voice', voices[1].id)
+    rate = engine.getProperty("rate")
+    engine.setProperty("rate", rate + 50)  # Increase speech rate
+    voices = engine.getProperty("voices")
+    engine.setProperty("voice", voices[1].id)
 
     udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    udp_socket.bind(('192.168.1.100', cf.collector_number))
+    udp_socket.bind(("192.168.1.100", collector_number))
 
-    reallocated_data_size = (cf.time_preread + 1) * cf.sample_rate
+    reallocated_data_size = (once_read_time + 1) * sample_rate
     output_data = np.zeros((reallocated_data_size, 64), dtype=np.float32)
 
     start_time = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
     try:
         i = 1
-        while i < (cf.turn_read_sum + 1):
-            for gesture_number in cf.gesture:
+        while i < (times_read_gesture + 1):
+            for gesture_number in gesture_sequence:
                 text_to_speak = f"Please prepare for gesture {gesture_number}, collection starting."
                 print(text_to_speak)
                 engine.say(text_to_speak)
@@ -109,28 +171,57 @@ def sEMG_data_save_offline():
                 while collected_samples < reallocated_data_size:
                     data, addr = udp_socket.recvfrom(1300)
                     transposed_data = np.frombuffer(data[18:1298], dtype="<i2").reshape(10, 64) * 0.195
-                    output_data[collected_samples:collected_samples + 10, :] = transposed_data
+                    output_data[collected_samples : collected_samples + 10, :] = transposed_data
                     collected_samples += 10
 
                 # Save data to file
-                with open(cf.data_path + f'original_data/sEMG_data{gesture_number}.csv', 'a') as f:
-                    np.savetxt(f, output_data[cf.sample_rate:, :], delimiter=',', fmt='%.6f')
+                with open(path_to_save_data + f"original_data/sEMG_data{gesture_number}.csv", "a") as f:
+                    np.savetxt(f, output_data[sample_rate:, :], delimiter=",", fmt="%.6f")
                 time.sleep(0.5)
                 text_to_speak = "Please rest."
                 print(text_to_speak)
                 engine.say(text_to_speak)
                 engine.runAndWait()
-                time.sleep(15)
+                time.sleep(gesture_rest)
 
             i += 1
-            time.sleep(25)
+            time.sleep(loop_rest)
 
     finally:
         end_time = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
 
-        generate_volunteer_experiment_info(start_time, end_time)
+        write_config_file(
+            gesture_sequence,
+            times_read_gesture,
+            once_read_time,
+            gesture_rest,
+            loop_rest,
+            cf.path_to_save_data,
+            start_time,
+            end_time,
+        )
 
         udp_socket.close()
 
-        print(f"\u2764Please rename the folder [{cf.data_path}] to identifier "
-              "and complete the details of the [vol_exp_info.json].")
+        print(
+            f"\u2764 Please rename the folder [{path_to_save_data}] to identifier "
+            "and complete the details of the comment."
+        )
+
+
+if __name__ == "__main__":
+    # init global config
+    cf = GlobalConfig()
+    cf.config_init()
+    cf.display_config()
+    cf.update_param("path_to_save_data", create_data_folder(str(cf.project_root)))
+    sEMG_data_save_offline(
+        cf.collector_number,
+        cf.once_read_time,
+        cf.sample_rate,
+        cf.times_read_gesture,
+        cf.gesture_sequence,
+        cf.path_to_save_data,
+        cf.gesture_rest,
+        cf.loop_rest,
+    )

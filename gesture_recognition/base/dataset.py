@@ -6,42 +6,42 @@
 # @Software: PyCharm
 
 import os
-from typing import List, Tuple, Dict
+from concurrent.futures import ProcessPoolExecutor
+from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 from numpy.lib.stride_tricks import as_strided
-from concurrent.futures import ProcessPoolExecutor
 
-import config as cf
-from gesture_recognition.script.filtering import bandpass_and_notch_filter
-from gesture_recognition.script.calculate_features import mav, mse, zc, wamp, rms
+from gesture_recognition.base.calculate_features import mav, mse, zc, wamp, rms
+from gesture_recognition.base.filtering import bandpass_and_notch_filter
+
 
 # ------------------------------ #
 #   Feature Extraction Function  #
 # ------------------------------ #
 
 
-def tfrecord_establish(df: np.ndarray, gesture_number: int, dataset_type: str):
+def tfrecord_establish(
+        df: np.ndarray,
+        gesture_number: int,
+        dataset_type: str,
+        data_indices:list,
+        once_read_time:int,
+        sample_rate:int,
+        window_size:int,
+        step_size:int,
+        window_size_little:int,
+        step_size_little:int,
+        path_to_use_data:str,
+        max_workers:int = 10
+):
     """
     General data processing function for feature extraction and saving for training, testing, and validation datasets.
 
     This function extracts features from input signals, processes them, and saves them as TensorFlow TFRecord files.
-
-    :param df: Input signal data (shape: [num_channels, signal_length])
-    :param gesture_number: Gesture identifier (integer)
-    :param dataset_type: Type of dataset ('train'/'test'/'val')
     """
-
-    if dataset_type == "train":
-        read_times_list = cf.train_nums
-    elif dataset_type == "test":
-        read_times_list = cf.test_nums
-    elif dataset_type == "val":
-        read_times_list = cf.val_nums
-    else:
-        raise ValueError(f"Invalid dataset_type: {dataset_type}. Expected 'train', 'test', or 'val'.")
 
     window_data_features = []
     window_data_labels = []
@@ -52,17 +52,17 @@ def tfrecord_establish(df: np.ndarray, gesture_number: int, dataset_type: str):
             dataset_type,
             df,
             gesture_number,
-            cf.time_preread,
-            cf.sample_rate,
-            cf.window_size,
-            cf.step_size,
-            cf.window_size_little,
-            cf.step_size_little,
+            once_read_time,
+            sample_rate,
+            window_size,
+            step_size,
+            window_size_little,
+            step_size_little,
         )
-        for rt in read_times_list
+        for rt in data_indices
     ]
 
-    with ProcessPoolExecutor(max_workers=10) as executor:
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
         results = executor.map(process_read_time, tasks)
 
         for f, l in results:
@@ -74,14 +74,11 @@ def tfrecord_establish(df: np.ndarray, gesture_number: int, dataset_type: str):
 
     dataset = tf.data.Dataset.from_tensor_slices((window_data_feature_tensor, label_tensor))
 
-    save_path = os.path.join(cf.data_path, "processed_data")
+    save_path = os.path.join(path_to_use_data, "processed_data")
     os.makedirs(save_path, exist_ok=True)
 
     tfrecord_path = os.path.join(save_path, f"data_{gesture_number}_{dataset_type}.tfrecord")
     tfrecord_save(dataset, tfrecord_path)
-
-    cf.feature_shape = window_data_features[0].shape
-
 
 def process_read_time(args):
     """Wrapper function for parallel processing of a single read_time"""
@@ -106,7 +103,7 @@ def process_read_time(args):
 
     for j in range(0, single_acquire_data.shape[0] - window_size + 1, step_size):
         window_data = single_acquire_data[j : j + window_size, :]
-        window_data = bandpass_and_notch_filter(window_data)
+        window_data = bandpass_and_notch_filter( data = window_data)
         features.append(primary_window_feature(window_data, secondary_window_size, secondary_step_size))
         labels.append(gesture_number - 1)
 
@@ -126,11 +123,13 @@ def primary_window_feature(data: np.ndarray, secondary_window_size: int, seconda
 
     num_windows = (signal_length - secondary_window_size) // secondary_step_size + 1
 
-    strided_shape = (num_windows, secondary_window_size, num_channels)
-    strided_strides = (secondary_step_size * data.strides[0], data.strides[0], data.strides[1])
-    windows = as_strided(data, shape=strided_shape, strides=strided_strides)
+    striped_shape = (num_windows, secondary_window_size, num_channels)
+    striped_strides = (secondary_step_size * data.strides[0], data.strides[0], data.strides[1])
+    windows = as_strided(data, shape=striped_shape, strides=striped_strides)
 
     features = z_score_normalize_per_timestep(np.apply_along_axis(secondary_window_feature, 1, windows))
+
+    # features = np.transpose(features, (0, 2, 1))
 
     return features
 
@@ -199,7 +198,19 @@ def min_max_normalize_per_timestep(features: np.ndarray) -> np.ndarray:
 # ------------------------------ #
 
 
-def database_create():
+def database_create(
+        train_indices:list,
+        test_indices:list,
+        val_indices:list,
+        gesture_sequence:list,
+        path_to_use_data:str,
+        once_read_time:int,
+        sample_rate:int,
+        window_size:int,
+        step_size:int,
+        window_size_little:int,
+        step_size_little:int
+        ):
     """
     Process the data and create the corresponding TFRecord files for training, testing, and validation datasets.
 
@@ -208,29 +219,41 @@ def database_create():
     """
     print("Processing the data, please wait...")
     print(
-        f"Using the {cf.train_nums}-th data collection as the training set,\n"
-        f"Using the {cf.test_nums}-th data collection as the test set,\n"
-        f"Using the {cf.val_nums}-th data collection as the validation set.\n"
+        f"Using the {train_indices}-th data collection as the training set,\n"
+        f"Using the {test_indices}-th data collection as the test set,\n"
+        f"Using the {val_indices}-th data collection as the validation set.\n"
     )
 
-    for gesture_number in cf.gesture:
-        path = cf.data_path + f"original_data/sEMG_data{gesture_number}.csv"
+    for gesture_number in gesture_sequence:
+
+        path = path_to_use_data + f"original_data/sEMG_data{gesture_number}.csv"
         df = pd.read_csv(path, header=None).to_numpy()
-        for dataset_type in ["train", "val", "test"]:
-            tfrecord_establish(df, gesture_number, dataset_type)
+        for dataset_type, data_indices in [("train",train_indices), ("val",val_indices),( "test",test_indices)]:
+            tfrecord_establish(df = df,
+                               gesture_number=gesture_number,
+                               dataset_type=dataset_type,
+                               data_indices=data_indices,
+                               once_read_time = once_read_time,
+                               sample_rate = sample_rate,
+                               window_size = window_size,
+                               step_size =step_size,
+                               window_size_little = window_size_little,
+                               step_size_little = step_size_little,
+                               path_to_use_data = path_to_use_data,
+                                )
         print(f"Gesture {gesture_number} data processing completed.")
 
 
-def tfrecord_connect():
+def tfrecord_connect( gesture_sequence:list, path_to_use_data:str):
 
     for dataset_type in ["train", "test", "val"]:
 
         merged_dataset = None
 
-        for gesture_number in cf.gesture:
+        for gesture_number in gesture_sequence:
 
             dataset = load_tfrecord_to_dataset(
-                cf.data_path + f"processed_data/data_{gesture_number}_{dataset_type}.tfrecord"
+                path_to_use_data + f"processed_data/data_{gesture_number}_{dataset_type}.tfrecord"
             )
 
             if merged_dataset is None:
@@ -238,7 +261,7 @@ def tfrecord_connect():
             else:
                 merged_dataset = merged_dataset.concatenate(dataset)
 
-        connect_tfrecord_save_path = os.path.join(cf.data_path, f"processed_data/data_contact_{dataset_type}.tfrecord")
+        connect_tfrecord_save_path = os.path.join(path_to_use_data, f"processed_data/data_contact_{dataset_type}.tfrecord")
 
         tfrecord_save(merged_dataset, connect_tfrecord_save_path)
 
@@ -273,23 +296,22 @@ def tfrecord_save(dataset: tf.data.Dataset, tfrecord_save_path: str):
 # ----------------------------- #
 
 
-def _parse_function(proto: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
-    """
-    Parse each Example from the TFRecord file and adjust the data types and shapes.
+def _parse_function(proto: tf.Tensor, feature_shape: list) -> Tuple[tf.Tensor, tf.Tensor]:
+    """Parses TFRecord example into (features, label) tensors.
 
-    Parameters:
-    proto (tf.Tensor): The input TFRecord data.
+    Args:
+        proto: Serialized TFRecord data
+        feature_shape: Shape of the feature data
 
     Returns:
-    Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]: Parsed data including window data, label.
+        Tuple of (window_data, label) tensors
     """
-    keys_to_features: Dict[str, tf.io.FixedLenFeature] = {
-        "window": tf.io.FixedLenFeature(cf.feature_shape, tf.float32),
+    keys_to_features = {
+        "window": tf.io.FixedLenFeature(feature_shape, tf.float32),
         "label": tf.io.FixedLenFeature([1], tf.int64),
     }
 
     data = tf.io.parse_single_example(proto, keys_to_features)
-
     data["label"] = tf.cast(data["label"], tf.uint8)
 
     return data["window"], data["label"]
@@ -399,4 +421,4 @@ def load_tfrecord_data_label(tfrecord_path: str) -> Tuple[tf.Tensor, tf.Tensor]:
 
 
 if __name__ == "__main__":
-    cf.config_read()
+    pass

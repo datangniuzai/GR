@@ -14,7 +14,7 @@ from tensorflow.keras.layers import (
 from tensorflow.keras.models import Model
 from tensorflow.keras.utils import register_keras_serializable
 
-import config as cf
+import base_config as cf
 
 
 @tf.keras.utils.register_keras_serializable(package="Custom", name="ChannelSelector")
@@ -162,7 +162,7 @@ class LiteSTFNetLayer(Layer):
 
     def get_config(self):
         """
-        Returns the config dictionary for the custom layer.
+        Returns the base_config dictionary for the custom layer.
         """
         config = super(LiteSTFNetLayer, self).get_config()
         config.update({

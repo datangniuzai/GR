@@ -61,7 +61,7 @@ class GlobalConfig:
     # Window step size
     step_size = 200
     # Small window size
-    window_size_little = 100
+    window_size_little = 150
     # Small window step size
     step_size_little = 50
     # Number of epochs
@@ -195,6 +195,7 @@ class GlobalConfig:
         Initialize all parameters.
         mode_dict = {'data_reading_and_saving','model_training','data_analysis','online_display'}
         """
+
         cls.project_root = find_project_root()
 
         cls.mode_use = mode_set()
@@ -212,6 +213,10 @@ class GlobalConfig:
         time.sleep(0.01)
 
         if cls.mode_use in ['model_training', 'data_analysis']:
+
+            if cls.path_to_use_data[-1] != '/':
+                cls.path_to_use_data += '/'
+
             # 1. Load and update configuration
             cls.update_global_config()
 
@@ -257,6 +262,7 @@ class GlobalConfig:
                         f"exceeds available {cls.times_read_gesture} collected samples. "
                         f"Please adjust your dataset split ratios."
                     )
+
     @classmethod
     def update_global_config(cls):
         """Load and validate DataConfig against GlobalConfig parameters"""

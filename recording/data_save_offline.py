@@ -5,17 +5,16 @@
 # @File : data_save_offline.py
 # @Software: PyCharm
 
-
-import datetime
-import logging
 import os
-import socket
 import time
+import socket
+import logging
+import datetime
 from pathlib import Path
 from typing import List, Union
 
-import numpy as np
 import pyttsx3
+import numpy as np
 
 from base_config.config import GlobalConfig
 
@@ -67,6 +66,7 @@ def create_data_folder(base_root_path: Union[str, Path]) -> str:
     logging.info(f"[System] Experiment directory initialized at:\n{abs_path}")
 
     return f"data/{timestamp}/"
+
 
 def write_config_file(
     gesture_sequence: List,
@@ -133,14 +133,14 @@ class DataConfig:
 
 
 def sEMG_data_save_offline(
-    collector_number:int,
-    once_read_time:int,
-    sample_rate:int,
-    times_read_gesture:int,
-    gesture_sequence:List,
-    path_to_save_data:str,
-    gesture_rest:int,
-    loop_rest:int,
+    collector_number: int,
+    once_read_time: int,
+    sample_rate: int,
+    times_read_gesture: int,
+    gesture_sequence: List,
+    path_to_save_data: str,
+    gesture_rest: int,
+    loop_rest: int,
 ):
 
     engine = pyttsx3.init()
@@ -210,11 +210,14 @@ def sEMG_data_save_offline(
 
 
 if __name__ == "__main__":
+
     # init global config
     cf = GlobalConfig()
     cf.config_init()
     cf.display_config()
+
     cf.update_param("path_to_save_data", create_data_folder(str(cf.project_root)))
+
     sEMG_data_save_offline(
         cf.collector_number,
         cf.once_read_time,

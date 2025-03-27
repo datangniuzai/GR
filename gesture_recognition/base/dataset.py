@@ -5,19 +5,22 @@
 # @File : filtering.py
 # @Software: PyCharm
 
+
+import logging
 import os
 import time
-from typing import List, Tuple
 from concurrent.futures import ProcessPoolExecutor
+from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 from numpy.lib.stride_tricks import as_strided
 
+from base_config.config import GlobalConfig
 from gesture_recognition.base.calculate_features import mav, mse, zc, wamp, rms
 from gesture_recognition.base.filtering import bandpass_and_notch_filter
-from base_config.config import GlobalConfig
+
 
 # ------------------------------ #
 #   Feature Extraction Function  #
@@ -198,6 +201,7 @@ def write_td_data_info(
         train_indices:list,
         test_indices:list,
         val_indices:list,
+        remaining_numbers: list,
         gesture_sequence:list,
         window_size:int,
         step_size:int,
@@ -215,12 +219,16 @@ def write_td_data_info(
         f.write(f"train_indices: {train_indices}\n")
         f.write(f"test_indices: {test_indices}\n")
         f.write(f"val_indices: {val_indices}\n")
+        f.write(f"remaining_numbers: {remaining_numbers}")
         f.write(f"gesture_sequence: {gesture_sequence}\n")
         f.write(f"window_size: {window_size}\n")
         f.write(f"step_size: {step_size}\n")
         f.write(f"window_size_little: {window_size_little}\n")
         f.write(f"step_size_little: {step_size_little}\n")
         f.write("\nGenerated at: " + time.strftime("%Y-%m-%d %H:%M:%S") + "\n")
+
+    print(f"Data processing info saved to: {info_file_path}")
+    logging.INFO(f"Data processing info saved to: {info_file_path}")
 
 # ------------------------------ #
 #   Tfrecord Build Function      #
@@ -231,6 +239,7 @@ def database_create(
         train_indices:list,
         test_indices:list,
         val_indices:list,
+        remaining_numbers:list,
         gesture_sequence:list,
         path_to_use_data:str,
         once_read_time:int,
@@ -257,6 +266,7 @@ def database_create(
         train_indices,
         test_indices,
         val_indices,
+        remaining_numbers,
         gesture_sequence,
         window_size,
         step_size,
@@ -284,7 +294,7 @@ def database_create(
         print(f"Gesture {gesture_number} data processing completed.")
 
 
-def tfrecord_connect( gesture_sequence:list, path_to_use_data:str):
+def tfrecord_connect(gesture_sequence:list, path_to_use_data:str,feature_shape:list):
 
     for dataset_type in ["train", "test", "val"]:
 
@@ -293,7 +303,7 @@ def tfrecord_connect( gesture_sequence:list, path_to_use_data:str):
         for gesture_number in gesture_sequence:
 
             dataset = load_tfrecord_to_dataset(
-                path_to_use_data + f"processed_data/data_{gesture_number}_{dataset_type}.tfrecord"
+                path_to_use_data + f"processed_data/data_{gesture_number}_{dataset_type}.tfrecord",feature_shape
             )
 
             if merged_dataset is None:
@@ -306,7 +316,7 @@ def tfrecord_connect( gesture_sequence:list, path_to_use_data:str):
         tfrecord_save(merged_dataset, connect_tfrecord_save_path)
 
         print(f"[{dataset_type}] data has been merged and saved at [{connect_tfrecord_save_path}]")
-
+        logging.info(f"[{dataset_type}] data has been merged and saved at [{connect_tfrecord_save_path}]")
     print("data connection over")
 
 
@@ -357,7 +367,7 @@ def _parse_function(proto: tf.Tensor, feature_shape: list) -> Tuple[tf.Tensor, t
     return data["window"], data["label"]
 
 
-def load_tfrecord_to_dataset(tfrecord_path: str) -> tf.data.Dataset:
+def load_tfrecord_to_dataset(tfrecord_path: str,feature_shape:list) -> tf.data.Dataset:
     """
     Load data from a TFRecord file.
 
@@ -370,12 +380,12 @@ def load_tfrecord_to_dataset(tfrecord_path: str) -> tf.data.Dataset:
 
     dataset = tf.data.TFRecordDataset(tfrecord_path)
 
-    dataset = dataset.map(_parse_function)
+    dataset = dataset.map(lambda x: _parse_function(x, feature_shape))
 
     return dataset
 
 
-def load_tfrecord_to_list(tfrecord_path: str) -> Tuple[List[np.ndarray], List[int]]:
+def load_tfrecord_to_list(tfrecord_path: str,feature_shape:list) -> Tuple[List[np.ndarray], List[int]]:
     """
     Load the TFRecord file and return the data as lists.
 
@@ -389,7 +399,7 @@ def load_tfrecord_to_list(tfrecord_path: str) -> Tuple[List[np.ndarray], List[in
         - labels (List[int]): List of label integers.
     """
     dataset = tf.data.TFRecordDataset(tfrecord_path)
-    dataset = dataset.map(_parse_function)
+    dataset = dataset.map(lambda x: _parse_function(x, feature_shape))
 
     window_datas: List[np.ndarray] = []
     labels: List[int] = []
@@ -431,21 +441,13 @@ def load_tfrecord_to_tensor(tfrecord_path: str) -> Tuple[tf.Tensor, tf.Tensor]:
     return window_datas, labels
 
 
-def load_tfrecord_data_label(tfrecord_path: str) -> Tuple[tf.Tensor, tf.Tensor]:
+def load_tfrecord_data_label(tfrecord_path: str, feature_shape:list) -> Tuple[tf.Tensor, tf.Tensor]:
     """
     Load the TFRecord file and return window data, adjacency matrix, and labels as Tensors.
-
-    Parameters:
-    tfrecord_path (str): Path to the TFRecord file.
-
-    Returns:
-    Tuple[tf.Tensor, tf.Tensor, tf.Tensor]: A tuple containing:
-        - window_datas (tf.Tensor): Tensor containing window data.
-        - labels (tf.Tensor): Tensor containing labels.
     """
     dataset = tf.data.TFRecordDataset(tfrecord_path)
 
-    dataset = dataset.map(_parse_function)
+    dataset = dataset.map(lambda x: _parse_function(x, feature_shape))
 
     window_datas = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
     labels = tf.TensorArray(dtype=tf.uint8, size=0, dynamic_size=True)

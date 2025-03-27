@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 from typing import List
 
-from base_config.init_function import mode_set, find_project_root, create_log_file, get_data_set_mode, split_data
+from base_config.init_function import select_operation_mode, find_project_root, create_log_file, split_dataset_mode, split_data
 
 
 class GlobalConfig:
@@ -28,7 +28,7 @@ class GlobalConfig:
     # Collector number
     collector_number: int = 8081
     # Data folder path when use data
-    path_to_use_data: str = "data/240909-LJX-Man-S-17"
+    path_to_use_data: str = "data/240908-LGJ-Man-S-17"
     # Input feature shape
     feature_shape: List = [6, 5, 64]
 
@@ -69,8 +69,9 @@ class GlobalConfig:
     # Small window step size
     step_size_little = 50
     # Number of epochs
-    epochs = 30
-
+    epochs = 3
+    # Model path
+    model_path: str = None
     """Input parameters"""
     # Mode
     # Data Reading and Saving;
@@ -94,28 +95,28 @@ class GlobalConfig:
     path_to_save_data: str = None
 
     # Directory where all outputs from training (models, figures etc.) will be stored
-    training_output_dir: str = None
+    train_folder_path: str = None
     # File path to save training metrics history (e.g., loss, accuracy) in CSV format and training_config.txt.
-    train_metrics_path: str = None
+    train_config_txt_path: str = None
     # File path to save test results (e.g. acc, recall)
-    test_results_path: str = None
+    test_results_csv_path: str = None
+    # File path to save training history (e.g. loss, accuracy)
+    history_csv_file:str = None
 
     # Number of gestures
     gesture_num: int = None
 
     # Model
     model = None
-    # Model path
-    model_path: str = None
     # Model name
     model_name: str = None
-    # Training history
-    model_history = None
 
     # Model training start time
-    time_start_train = None
+    start_train_time = None
     # Model training end time
-    time_end_train = None
+    end_train_time = None
+    # Model training time
+    train_duration_minutes = None
 
     @classmethod
     def update_param(cls, param_name, value):
@@ -176,6 +177,7 @@ class GlobalConfig:
                             "window_size_little",
                             "step_size_little",
                             "epochs",
+                            "model_path"
                         ]
                     )
                     or (
@@ -191,17 +193,17 @@ class GlobalConfig:
                             "project_root",
                             "log_path",
                             "remaining_numbers",
-                            "path_to_save_data",
-                            "training_output_dir",
-                            "train_metrics_path",
-                            "test_results_path",
                             "gesture_num",
+                            "path_to_save_data",
+                            "train_folder_path",
+                            "train_config_txt_path",
+                            "history_csv_file"
+                            "test_results_csv_path",
                             "model",
-                            "model_path",
                             "model_name",
-                            "model_history",
-                            "time_start_train",
-                            "time_end_train",
+                            "start_train_time",
+                            "end_train_time",
+                            "train_duration_minutes"
                         ]
                     )
                 ):
@@ -224,7 +226,7 @@ class GlobalConfig:
 
         cls.project_root = find_project_root()
 
-        cls.mode_use = mode_set()
+        cls.mode_use = select_operation_mode()
 
         if log_path is None:
             log_path = f"logs/{cls.mode_use}_{datetime.datetime.now().strftime('%m-%d_%H-%M')}.log"
@@ -244,7 +246,7 @@ class GlobalConfig:
                 cls.path_to_use_data += "/"
 
             # 1. Get dataset split mode
-            data_set_mode, cls.tvt_select_mode = get_data_set_mode()
+            data_set_mode, cls.tvt_select_mode = split_dataset_mode()
 
             # 2. Load and update configuration
             if data_set_mode == "1" or data_set_mode == "2":
@@ -323,6 +325,8 @@ class GlobalConfig:
                     cls.train_indices = param_dict["train_indices"]
                     cls.test_indices = param_dict["test_indices"]
                     cls.val_indices = param_dict["val_indices"]
+                    cls.remaining_numbers = param_dict["remaining_numbers"]
+
                     cls.train_num = len(cls.train_indices)
                     cls.test_num = len(cls.test_indices)
                     cls.val_num = len(cls.val_indices)
@@ -347,6 +351,7 @@ class GlobalConfig:
                         "Please check the file format or reprocess your data."
                     )
 
+            cls.gesture_num =  len(cls.gesture_sequence)
             cls.feature_shape = [(cls.window_size - cls.window_size_little) // cls.step_size_little + 1, 5, 64]
 
     @classmethod

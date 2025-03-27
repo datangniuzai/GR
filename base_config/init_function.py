@@ -14,7 +14,33 @@ from pathlib import Path
 from typing import List, Tuple,Union
 
 
-def get_data_set_mode() -> tuple[str, str]:
+def select_operation_mode() -> str:
+    """
+    Prompts the user to select the mode using a dictionary and returns the selected mode.
+
+    Returns:
+        str: A string representing the selected mode ('Data Reading and Saving',
+             'Model Training', 'Data Analysis', or 'Online Display').
+    """
+    mode_dict = {"1": "data_reading_and_saving", "2": "model_training", "3": "data_analysis", "4": "online_display"}
+
+    while True:
+        print("================================")
+        pattern_mode = input(
+            "Please select the mode:\n"
+            "1. Data Reading and Saving;\n"
+            "2. Model Training;\n"
+            "3. Data Analysis;\n"
+            "4. Online Display;\n"
+            "(Enter your choice): "
+        )
+        print("================================")
+        if pattern_mode in mode_dict:
+            return mode_dict[pattern_mode]
+        else:
+            print("⚠️ Invalid input! Please enter '1', '2', '3', or '4' to select the mode.\n")
+
+def split_dataset_mode() -> tuple[str, str]:
     """
     Prompts the user to choose the dataset split mode and returns the selected mode and its description.
 
@@ -47,32 +73,6 @@ def get_data_set_mode() -> tuple[str, str]:
 
         print(f"⚠️ Invalid input: '{data_set_mode}'. Please enter 1, 2, or 3.\n")
 
-
-def mode_set() -> str:
-    """
-    Prompts the user to select the mode using a dictionary and returns the selected mode.
-
-    Returns:
-        str: A string representing the selected mode ('Data Reading and Saving',
-             'Model Training', 'Data Analysis', or 'Online Display').
-    """
-    mode_dict = {"1": "data_reading_and_saving", "2": "model_training", "3": "data_analysis", "4": "online_display"}
-
-    while True:
-        print("================================")
-        pattern_mode = input(
-            "Please select the mode:\n"
-            "1. Data Reading and Saving;\n"
-            "2. Model Training;\n"
-            "3. Data Analysis;\n"
-            "4. Online Display;\n"
-            "(Enter your choice): "
-        )
-        print("================================")
-        if pattern_mode in mode_dict:
-            return mode_dict[pattern_mode]
-        else:
-            print("⚠️ Invalid input! Please enter '1', '2', '3', or '4' to select the mode.\n")
 
 
 def find_project_root(start_path: Path = None) -> Path:

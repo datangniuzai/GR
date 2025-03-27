@@ -32,6 +32,9 @@ def bandpass_and_notch_filter(data: np.ndarray) -> np.ndarray:
     :param data: Input matrix (shape: [num_samples, channels]).
     :return: Filtered matrix (shape: [num_samples, channels]).
     """
+    if data.ndim != 2:
+        raise ValueError(f"Expected 2D array, got {data.ndim}D")
+
     num_samples, channels = data.shape
     pad_length = num_samples
     padded_data = np.pad(data, ((pad_length, pad_length), (0, 0)), mode='reflect')
@@ -93,12 +96,12 @@ class EMGFilter:
         """Design cascaded IIR notch filters."""
         sos_list = []
         for freq in self.notch_frequencies:
-            b, a = signal.iirnotch(
+            b_1, a_1 = signal.iirnotch(
                 w0=freq,
                 Q=self.notch_q,
                 fs=self.sample_rate
             )
-            sos_list.append(signal.tf2sos(b, a))
+            sos_list.append(signal.tf2sos(b_1, a_1))
         return np.vstack(sos_list)
 
     def apply_filters(self,

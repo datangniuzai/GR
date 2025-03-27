@@ -5,56 +5,60 @@
 # @File : base_config.py
 # @Software: PyCharm
 
+import ast
+import datetime
+import importlib.util
+import logging
 import os
 import sys
 import time
 from pathlib import Path
 from typing import List
-import datetime
-import importlib.util
-import logging
+
 from base_config.init_function import mode_set, find_project_root, create_log_file, get_data_set_mode, split_data
+
 
 class GlobalConfig:
     """Specified parameter"""
+
     # Channel number
-    num_channels:int = 64
+    num_channels: int = 64
     # Sampling rate
-    sample_rate:int = 2000
+    sample_rate: int = 2000
     # Collector number
-    collector_number:int = 8081
+    collector_number: int = 8081
     # Data folder path when use data
-    path_to_use_data:str = "data/240908-LGJ-Man-S-17"
+    path_to_use_data: str = "data/240909-LJX-Man-S-17"
     # Input feature shape
-    feature_shape:List = [6,5,64]
+    feature_shape: List = [6, 5, 64]
 
     # # Rest duration(second) between actions
     # action_rest:int = 20
     # Rest duration(second) between gestures
-    gesture_rest:int = 12
+    gesture_rest: int = 12
     # Rest duration(second) between one loop
-    loop_rest:int = 20
+    loop_rest: int = 20
     # Gesture label list, can override the dataset's original parameters
-    gesture_sequence = [1,2,3,4,5,6,7,8,9,10,11]
+    gesture_sequence = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
     # Total read times for one gesture
-    times_read_gesture:int = 20
+    times_read_gesture: int = 20
     # Duration of each read
-    once_read_time:int = 6
+    once_read_time: int = 6
 
     """ Dataset split parameter: Random"""
     # Training set count
-    train_num:int = 12
+    train_num: int = 12
     # Test set count
-    test_num:int = 4
+    test_num: int = 4
     # Validation set count
-    val_num:int = 4
+    val_num: int = 4
     """ Dataset split parameter: Specifying"""
     # Training set indices
-    train_indices:List = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
+    train_indices: List = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
     # Test set indices
-    test_indices:List = [16]
+    test_indices: List = [16]
     # Validation set indices
-    val_indices:List = [17,18,19,20,21]
+    val_indices: List = [17, 18, 19, 20]
 
     # Window size
     window_size = 400
@@ -73,38 +77,38 @@ class GlobalConfig:
     # Model Training;
     # Data Analysis;
     # Online Display;
-    mode_use:str = None
+    mode_use: str = None
     # Dataset selection mode: random /Specified
-    tvt_select_mode:str= None
+    tvt_select_mode: str = None
 
     """Generated parameters"""
 
     # project root path
-    project_root:Path = None
+    project_root: Path = None
     # log path
-    log_path:Path = None
+    log_path: Path = None
 
     # Unused data
-    remaining_numbers:list = None
+    remaining_numbers: list = None
     # data path to use when saving data
-    path_to_save_data:str = None
+    path_to_save_data: str = None
 
     # Directory where all outputs from training (models, figures etc.) will be stored
-    training_output_dir:str = None
+    training_output_dir: str = None
     # File path to save training metrics history (e.g., loss, accuracy) in CSV format and training_config.txt.
-    train_metrics_path:str = None
+    train_metrics_path: str = None
     # File path to save test results (e.g. acc, recall)
-    test_results_path:str = None
+    test_results_path: str = None
 
     # Number of gestures
-    gesture_num:int = None
+    gesture_num: int = None
 
     # Model
     model = None
     # Model path
-    model_path:str = None
+    model_path: str = None
     # Model name
-    model_name:str = None
+    model_name: str = None
     # Training history
     model_history = None
 
@@ -132,10 +136,7 @@ class GlobalConfig:
         strictly following the original comment grouping.
         """
         # Get non-method attributes
-        config_items = {
-            k: v for k, v in cls.__dict__.items()
-            if not k.startswith('__') and not callable(v)
-        }
+        config_items = {k: v for k, v in cls.__dict__.items() if not k.startswith("__") and not callable(v)}
 
         if not config_items:
             print("No configuration parameters found")
@@ -145,12 +146,7 @@ class GlobalConfig:
         max_len = max(len(str(k)) for k in config_items.keys()) + 2
 
         # Section titles in EXACT original order
-        sections = [
-            "Specified parameter",
-            "Dataset split parameters",
-            "Input parameters",
-            "Generated parameters"
-        ]
+        sections = ["Specified parameter", "Dataset split parameters", "Input parameters", "Generated parameters"]
 
         # Track displayed params to find leftovers
         displayed_params = set()
@@ -160,25 +156,55 @@ class GlobalConfig:
             print(f'\n""" {section} """')
             for param, value in config_items.items():
                 # Find params that belong to this section by code position
-                if (section == "Specified parameter" and param in [
-                    'num_channels', 'sample_rate', 'collector_number',
-                    'path_to_use_data', 'feature_shape', 'gesture_rest',
-                    'loop_rest', 'gesture_sequence', 'times_read_gesture',
-                    'once_read_time','window_size','step_size','window_size_little',
-                    'step_size_little','epochs'
-                ]) or (section == "Dataset split parameters" and param in [
-                    'train_num', 'test_num', 'val_num', 'train_indices',
-                    'test_indices', 'val_indices'
-                ]) or (section == "Input parameters" and param in [
-                    'mode_use', 'tvt_select_mode'
-                ]) or (section == "Generated parameters" and param in [
-                    'project_root', 'log_path', 'remaining_numbers',
-                    'path_to_save_data', 'training_output_dir',
-                    'train_metrics_path', 'test_results_path',
-                    'gesture_num', 'model', 'model_path',
-                    'model_name', 'model_history',
-                    'time_start_train', 'time_end_train'
-                ]):
+                if (
+                    (
+                        section == "Specified parameter"
+                        and param
+                        in [
+                            "num_channels",
+                            "sample_rate",
+                            "collector_number",
+                            "path_to_use_data",
+                            "feature_shape",
+                            "gesture_rest",
+                            "loop_rest",
+                            "gesture_sequence",
+                            "times_read_gesture",
+                            "once_read_time",
+                            "window_size",
+                            "step_size",
+                            "window_size_little",
+                            "step_size_little",
+                            "epochs",
+                        ]
+                    )
+                    or (
+                        section == "Dataset split parameters"
+                        and param
+                        in ["train_num", "test_num", "val_num", "train_indices", "test_indices", "val_indices"]
+                    )
+                    or (section == "Input parameters" and param in ["mode_use", "tvt_select_mode"])
+                    or (
+                        section == "Generated parameters"
+                        and param
+                        in [
+                            "project_root",
+                            "log_path",
+                            "remaining_numbers",
+                            "path_to_save_data",
+                            "training_output_dir",
+                            "train_metrics_path",
+                            "test_results_path",
+                            "gesture_num",
+                            "model",
+                            "model_path",
+                            "model_name",
+                            "model_history",
+                            "time_start_train",
+                            "time_end_train",
+                        ]
+                    )
+                ):
                     print(f"  {param.ljust(max_len)} : {value}")
                     displayed_params.add(param)
 
@@ -190,7 +216,7 @@ class GlobalConfig:
         #         print(f"  {param.ljust(max_len)} : {value}")
 
     @classmethod
-    def config_init(cls,log_path:str = None):
+    def config_init(cls, log_path: str = None):
         """
         Initialize all parameters.
         mode_dict = {'data_reading_and_saving','model_training','data_analysis','online_display'}
@@ -212,19 +238,20 @@ class GlobalConfig:
 
         time.sleep(0.01)
 
-        if cls.mode_use in ['model_training', 'data_analysis']:
+        if cls.mode_use in ["model_training", "data_analysis"]:
 
-            if cls.path_to_use_data[-1] != '/':
-                cls.path_to_use_data += '/'
+            if cls.path_to_use_data[-1] != "/":
+                cls.path_to_use_data += "/"
 
-            # 1. Load and update configuration
-            cls.update_global_config()
-
-            # 2. Get dataset split mode
+            # 1. Get dataset split mode
             data_set_mode, cls.tvt_select_mode = get_data_set_mode()
 
+            # 2. Load and update configuration
+            if data_set_mode == "1" or data_set_mode == "2":
+                cls.update_global_config()
+
             # 3. Handle random split mode
-            if data_set_mode == '1':
+            if data_set_mode == "1":
                 # Validate sample counts
                 requested_samples = cls.train_num + cls.val_num + cls.test_num
                 if requested_samples > cls.times_read_gesture:
@@ -236,25 +263,39 @@ class GlobalConfig:
                     )
 
                 # Split data if validation passes
-                (cls.train_indices,cls.test_indices,cls.val_indices,cls.remaining_numbers) = split_data(
-                    cls.times_read_gesture,cls.train_num,cls.test_num,cls.val_num)
-            elif data_set_mode == '2':
+                (cls.train_indices, cls.test_indices, cls.val_indices, cls.remaining_numbers) = split_data(
+                    cls.times_read_gesture, cls.train_num, cls.test_num, cls.val_num
+                )
+
+            elif data_set_mode == "2":
                 # Convert to sets for intersection checking
                 train_set = set(cls.train_indices)
                 test_set = set(cls.test_indices)
                 val_set = set(cls.val_indices)
 
-                # Critical validation: ensure mutually exclusive splits
+                # Critical validation 1: ensure mutually exclusive splits
                 if train_set & test_set or train_set & val_set or test_set & val_set:
                     raise ValueError(
                         "DATA LEAKAGE ALERT: Detected overlapping samples in train/val/test splits. "
                         "All splits must contain completely distinct indices."
                     )
 
+                # Critical validation 2: check all indices are within valid range
+                all_indices = train_set.union(test_set).union(val_set)
+                max_index = max(all_indices) if all_indices else 0
+                if max_index > cls.times_read_gesture:
+                    raise ValueError(
+                        f"Index out of bounds: Found index {max_index} "
+                        f"which exceeds maximum available samples ({cls.times_read_gesture}). "
+                        f"Please check your specified indices."
+                    )
+
+                # Update counts and validate total samples
                 cls.train_num = len(cls.train_indices)
                 cls.test_num = len(cls.test_indices)
                 cls.val_num = len(cls.val_indices)
                 requested_samples = cls.train_num + cls.val_num + cls.test_num
+
                 if requested_samples > cls.times_read_gesture:
                     raise ValueError(
                         f"Dataset configuration error: "
@@ -263,9 +304,55 @@ class GlobalConfig:
                         f"Please adjust your dataset split ratios."
                     )
 
+            elif data_set_mode == "3":
+                # Load parameters from existing dataset info file
+
+                info_file_path = os.path.join(cls.path_to_use_data, "processed_data", "tf_data_info.txt")
+
+                try:
+                    with open(info_file_path, "r") as f:
+                        lines = f.readlines()
+
+                    param_dict = {}
+                    for line in lines:
+                        if ":" in line and not line.startswith("Data Processing") and not line.startswith("Generated"):
+                            key, value = line.split(":", 1)
+                            param_dict[key.strip()] = ast.literal_eval(value.strip())
+
+                    # Update class attributes
+                    cls.train_indices = param_dict["train_indices"]
+                    cls.test_indices = param_dict["test_indices"]
+                    cls.val_indices = param_dict["val_indices"]
+                    cls.train_num = len(cls.train_indices)
+                    cls.test_num = len(cls.test_indices)
+                    cls.val_num = len(cls.val_indices)
+
+                    cls.window_size = param_dict["window_size"]
+                    cls.step_size = param_dict["step_size"]
+                    cls.window_size_little = param_dict["window_size_little"]
+                    cls.step_size_little = param_dict["step_size_little"]
+                    cls.gesture_sequence = param_dict["gesture_sequence"]
+                    # Calculate feature shape
+
+                    logging.info(f"Successfully loaded dataset parameters from {info_file_path}")
+
+                except FileNotFoundError:
+                    raise FileNotFoundError(
+                        f"Existing dataset info file not found at {info_file_path}. "
+                        "Please ensure you have processed data first or choose another mode."
+                    )
+                except Exception as e:
+                    raise ValueError(
+                        f"Failed to parse dataset info file: {str(e)}. "
+                        "Please check the file format or reprocess your data."
+                    )
+
+            cls.feature_shape = [(cls.window_size - cls.window_size_little) // cls.step_size_little + 1, 5, 64]
+
     @classmethod
     def update_global_config(cls):
         """Load and validate DataConfig against GlobalConfig parameters"""
+
         def load_data_config(path_to_use_data):
             config_path = Path(path_to_use_data) / "data_config.py"
             spec = importlib.util.spec_from_file_location("data_config", str(config_path))
@@ -279,7 +366,7 @@ class GlobalConfig:
         data_config.display_config()
 
         # Validate gesture sequence
-        if hasattr(data_config, 'gesture_sequence'):
+        if hasattr(data_config, "gesture_sequence"):
             config_numbers = set(cls.gesture_sequence)
             data_numbers = set(data_config.gesture_sequence)
 
@@ -299,11 +386,11 @@ class GlobalConfig:
                 cls._prompt_param_choice(
                     param_name="gesture_sequence",
                     config_value=cls.gesture_sequence,
-                    data_config_value=data_config.gesture_sequence
+                    data_config_value=data_config.gesture_sequence,
                 )
 
         # Validate times_read_gesture
-        if hasattr(data_config, 'times_read_gesture'):
+        if hasattr(data_config, "times_read_gesture"):
             if cls.times_read_gesture > data_config.times_read_gesture:
                 logging.error(
                     f"Gesture repetition count mismatch\n"
@@ -316,7 +403,7 @@ class GlobalConfig:
                 cls._prompt_param_choice(
                     param_name="times_read_gesture",
                     config_value=cls.times_read_gesture,
-                    data_config_value=data_config.times_read_gesture
+                    data_config_value=data_config.times_read_gesture,
                 )
 
         # Auto-adjust these parameters without prompt
@@ -329,22 +416,27 @@ class GlobalConfig:
         """Helper function to handle parameter choice prompts"""
         while True:
             time.sleep(0.01)
-            choice = input(
-                f"{param_name}: GlobalConfig ({config_value}) ≠ DataConfig ({data_config_value}). "
-                f"Use GlobalConfig? [Y/N]: "
-            ).strip().upper()
+            choice = (
+                input(
+                    f"{param_name}: GlobalConfig ({config_value}) ≠ DataConfig ({data_config_value}). "
+                    f"Use GlobalConfig? [Y/N]: "
+                )
+                .strip()
+                .upper()
+            )
 
-            if choice == 'Y':
+            if choice == "Y":
                 logging.info(f"Using GlobalConfig's {param_name}")
                 return
-            elif choice == 'N':
+            elif choice == "N":
                 setattr(cls, param_name, data_config_value)
                 logging.info(f"Using DataConfig's {param_name}")
                 return
             else:
                 print("Invalid input. Please enter Y or N.")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
 
     cf = GlobalConfig()
     cf.config_init()

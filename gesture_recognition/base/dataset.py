@@ -6,8 +6,9 @@
 # @Software: PyCharm
 
 import os
-from concurrent.futures import ProcessPoolExecutor
+import time
 from typing import List, Tuple
+from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 import pandas as pd
@@ -16,7 +17,7 @@ from numpy.lib.stride_tricks import as_strided
 
 from gesture_recognition.base.calculate_features import mav, mse, zc, wamp, rms
 from gesture_recognition.base.filtering import bandpass_and_notch_filter
-
+from base_config.config import GlobalConfig
 
 # ------------------------------ #
 #   Feature Extraction Function  #
@@ -192,6 +193,34 @@ def min_max_normalize_per_timestep(features: np.ndarray) -> np.ndarray:
     features_max = np.max(features, axis=(1, 2), keepdims=True)
     return (features - features_min) / (features_max - features_min)
 
+def write_td_data_info(
+        path_to_use_data:str,
+        train_indices:list,
+        test_indices:list,
+        val_indices:list,
+        gesture_sequence:list,
+        window_size:int,
+        step_size:int,
+        window_size_little:int,
+        step_size_little:int
+    ):
+    """
+    logging all parameters to tf_data_info.txt.
+    """
+
+    info_file_path = os.path.join(path_to_use_data, "processed_data", "tf_data_info.txt")
+
+    with open(info_file_path, 'w') as f:
+        f.write("Data Processing Parameters:\n")
+        f.write(f"train_indices: {train_indices}\n")
+        f.write(f"test_indices: {test_indices}\n")
+        f.write(f"val_indices: {val_indices}\n")
+        f.write(f"gesture_sequence: {gesture_sequence}\n")
+        f.write(f"window_size: {window_size}\n")
+        f.write(f"step_size: {step_size}\n")
+        f.write(f"window_size_little: {window_size_little}\n")
+        f.write(f"step_size_little: {step_size_little}\n")
+        f.write("\nGenerated at: " + time.strftime("%Y-%m-%d %H:%M:%S") + "\n")
 
 # ------------------------------ #
 #   Tfrecord Build Function      #
@@ -222,6 +251,17 @@ def database_create(
         f"Using the {train_indices}-th data collection as the training set,\n"
         f"Using the {test_indices}-th data collection as the test set,\n"
         f"Using the {val_indices}-th data collection as the validation set.\n"
+    )
+
+    write_td_data_info(path_to_use_data,
+        train_indices,
+        test_indices,
+        val_indices,
+        gesture_sequence,
+        window_size,
+        step_size,
+        window_size_little,
+        step_size_little
     )
 
     for gesture_number in gesture_sequence:
@@ -421,4 +461,7 @@ def load_tfrecord_data_label(tfrecord_path: str) -> Tuple[tf.Tensor, tf.Tensor]:
 
 
 if __name__ == "__main__":
-    pass
+
+    cf = GlobalConfig()
+    cf.config_init()
+

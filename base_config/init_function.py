@@ -13,26 +13,39 @@ import logging
 from pathlib import Path
 from typing import List, Tuple,Union
 
+
 def get_data_set_mode() -> tuple[str, str]:
     """
-    Prompts the user to choose the dataset split mode and returns the selected mode and its string representation.
+    Prompts the user to choose the dataset split mode and returns the selected mode and its description.
 
     Returns:
-        tuple: A tuple containing the dataset split mode choice ('1' or '2') and a string representation
-               of the chosen mode ('Random' or 'Specified').
+        tuple: A tuple containing:
+            - mode choice ('1', '2', or '3')
+            - string description ('Random', 'Specified', or 'Existing')
     """
     while True:
         time.sleep(0.01)
         data_set_mode = input(
-            "Please choose the dataset split mode: 1. Random; 2. Specified (Enter your choice): "
+            "Please choose the dataset split mode:\n"
+            "1. Random split\n"
+            "2. Specified split\n"
+            "3. Use existing dataset\n"
+            "Enter your choice (1/2/3): "
         ).strip()
-        if data_set_mode in ["1", "2"]:
-            tvt_select_mode = "Random" if data_set_mode == "1" else "Specified"
-            logging.info(f"User selected: {tvt_select_mode} split mode")
+
+        if data_set_mode in ["1", "2", "3"]:
+            mode_description = {
+                "1": "Random",
+                "2": "Specified",
+                "3": "Existing"
+            }[data_set_mode]
+            logging.info(f"User selected: {mode_description} split mode")
+            print(f"User selected: {mode_description} split mode")
             time.sleep(0.01)
-            return data_set_mode, tvt_select_mode
-        else:
-            print(f"⚠️ Invalid selection attempt: '{data_set_mode} Please enter '1' or '2'.\n")
+            print("================================")
+            return data_set_mode, mode_description
+
+        print(f"⚠️ Invalid input: '{data_set_mode}'. Please enter 1, 2, or 3.\n")
 
 
 def mode_set() -> str:
@@ -46,6 +59,7 @@ def mode_set() -> str:
     mode_dict = {"1": "data_reading_and_saving", "2": "model_training", "3": "data_analysis", "4": "online_display"}
 
     while True:
+        print("================================")
         pattern_mode = input(
             "Please select the mode:\n"
             "1. Data Reading and Saving;\n"
@@ -54,7 +68,7 @@ def mode_set() -> str:
             "4. Online Display;\n"
             "(Enter your choice): "
         )
-
+        print("================================")
         if pattern_mode in mode_dict:
             return mode_dict[pattern_mode]
         else:

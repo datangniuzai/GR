@@ -5,7 +5,6 @@
 # @File : filtering.py
 # @Software: PyCharm
 
-
 from typing import List, Optional, Tuple
 
 import numpy as np
@@ -13,6 +12,36 @@ import pandas as pd
 from scipy import signal
 
 from base_config.config import GlobalConfig
+
+# Global definition of filter coefficients
+# Bandpass filter (20Hz - 500Hz)
+
+SOS_BANDPASS = signal.butter(6, [20, 350], analog=False, btype='band', output='sos', fs= 2000)
+
+sos_notch = []
+for frequency in [50, 100, 150, 200, 250, 300]:
+    b, a = signal.iirnotch(frequency, 50, 2000)
+    sos = signal.tf2sos(b, a)
+    sos_notch.append(sos)
+SOS_NOTCH = np.concatenate(sos_notch, axis=0)
+
+def bandpass_and_notch_filter(data: np.ndarray) -> np.ndarray:
+    """
+    Applies bandpass filtering and merged notch filtering with padding to reduce edge effects.
+
+    :param data: Input matrix (shape: [num_samples, channels]).
+    :return: Filtered matrix (shape: [num_samples, channels]).
+    """
+    num_samples, channels = data.shape
+    pad_length = num_samples
+    padded_data = np.pad(data, ((pad_length, pad_length), (0, 0)), mode='reflect')
+    filtered_data = np.zeros_like(padded_data)
+
+    for i in range(channels):
+        filtered_data[:, i] = signal.sosfiltfilt(SOS_BANDPASS, padded_data[:, i])
+        filtered_data[:, i] = signal.sosfiltfilt(SOS_NOTCH, filtered_data[:, i])
+
+    return filtered_data[pad_length:-pad_length, :]
 
 
 class EMGFilter:

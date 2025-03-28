@@ -10,6 +10,7 @@ import sys
 import time
 import random
 import logging
+import datetime
 from pathlib import Path
 from typing import List, Tuple,Union
 
@@ -103,6 +104,54 @@ def find_project_root(start_path: Path = None) -> Path:
         "or modify the root directory search criteria as needed."
     )
 
+
+def create_data_folder(base_root_path: Union[str, Path]) -> str:
+    """Create timestamped data directory structure under specified base path.
+
+    Directory Structure:
+    [base_root_path]/
+    └── data/
+        └── YYYY-MM-DD_HH-MM-SS/
+            ├── processed_data/    # Cleaned/normalized datasets
+            ├── original_data/     # Raw collected data (immutable)
+            ├── picture/           # Visualization outputs (plots/charts)
+            └── all_train_info/    # Training metadata and logs
+
+    Args:
+        base_root_path: Parent directory where 'data' folder will be created
+
+    Returns:
+        str: Relative path from base_root_path to created folder
+             (format: "data/YYYY-MM-DD_HH-MM-SS/")
+    """
+    # Convert Path to string if necessary
+    if isinstance(base_root_path, Path):
+        data_root = os.path.join(str(base_root_path), "data")
+    else:
+        data_root = os.path.join(base_root_path, "data")
+    os.makedirs(data_root, exist_ok=True)
+
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    timestamp_dir = os.path.join(data_root, timestamp)
+
+    # Core directory structure
+    sub_dirs = (
+        "processed_data",  # For processed/cleaned data files
+        "original_data",  # For raw unprocessed data
+        "picture",  # For visualization outputs
+        "all_train_info",  # For training logs and metadata
+    )
+
+    # Create all directories
+    for dir_name in sub_dirs:
+        os.makedirs(os.path.join(timestamp_dir, dir_name), exist_ok=True)
+
+    abs_path = os.path.abspath(timestamp_dir)
+
+    print(f"[System] Experiment directory initialized at:\n{abs_path}")
+    logging.info(f"[System] Experiment directory initialized at:\n{abs_path}")
+
+    return f"data/{timestamp}/"
 
 def create_log_file(
         root_path: Union[str, Path],

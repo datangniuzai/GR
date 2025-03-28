@@ -15,7 +15,14 @@ import time
 from pathlib import Path
 from typing import List
 
-from base_config.init_function import select_operation_mode, find_project_root, create_log_file, split_dataset_mode, split_data
+from base_config.init_function import (
+    select_operation_mode,
+    find_project_root,
+    create_log_file,
+    split_dataset_mode,
+    split_data,
+    create_data_folder
+)
 
 
 class GlobalConfig:
@@ -229,13 +236,48 @@ class GlobalConfig:
 
         cls.project_root = find_project_root()
 
-        cls.mode_use = select_operation_mode()
+        cls.operation_mode = select_operation_mode()
+
+        data_saved_mode = None
+
+        if cls.operation_mode == "data_reading_and_saving":
+
+            cls.path_to_save_data = create_data_folder(cls.project_root)
+
+            while True:
+                print("\nSelect data acquisition mode:")
+                print("1. Simulated online signal (for system testing)")
+                print("2. Pre-recorded training dataset (for model development)")
+                data_saved_mode = input("Enter selection [1/2]: ").strip()
+
+                if data_saved_mode == '1':
+
+                    cls.log_path = Path(
+                        cls.path_to_save_data + f"simulated_online_{datetime.datetime.now().strftime('%m-%d_%H-%M')}.log")
+                    print(
+                        "[INSTRUCTION] Run the data_save_online.py and check the log file at the specified save path")
+
+                    break
+                elif data_saved_mode == '2':
+                    print(
+                        "[INSTRUCTION] Run the data_save_offline.py and review logs in the /logs directory")
+
+                    log_path = f"logs/{cls.operation_mode}_{datetime.datetime.now().strftime('%m-%d_%H-%M')}.log"
+                    cls.log_path = create_log_file(root_path=cls.project_root, log_path=log_path)
+
+                    break
+                else:
+                    print("! Invalid selection - must be 1 (simulation) or 2 (training) !")
 
         if log_path is None:
-            log_path = f"logs/{cls.mode_use}_{datetime.datetime.now().strftime('%m-%d_%H-%M')}.log"
-        cls.log_path = create_log_file(root_path=cls.project_root, log_path=log_path)
+            log_path = f"logs/{cls.operation_mode}_{datetime.datetime.now().strftime('%m-%d_%H-%M')}.log"
 
-        logging.info(f"The usage mode this time is: {cls.mode_use}")
+        if (cls.operation_mode != "data_reading_and_saving" or
+                (cls.operation_mode == "data_reading_and_saving" and data_saved_mode == '2')):
+            cls.log_path = create_log_file(root_path=cls.project_root, log_path=log_path)
+
+
+        logging.info(f"The usage mode this time is: {cls.operation_mode}")
 
         logging.info(f"Changing working directory to: {cls.project_root}")
         os.chdir(cls.project_root)
@@ -243,7 +285,7 @@ class GlobalConfig:
 
         time.sleep(0.01)
 
-        if cls.mode_use in ["model_training", "data_analysis"]:
+        if cls.operation_mode in ["model_training", "data_analysis"]:
 
             if cls.path_to_use_data[-1] != "/":
                 cls.path_to_use_data += "/"

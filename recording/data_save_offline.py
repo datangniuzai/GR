@@ -10,62 +10,13 @@ import time
 import socket
 import logging
 import datetime
-from pathlib import Path
-from typing import List, Union
+from typing import List
 
 import pyttsx3
 import numpy as np
 
 from base_config.config import GlobalConfig
 
-
-def create_data_folder(base_root_path: Union[str, Path]) -> str:
-    """Create timestamped data directory structure under specified base path.
-
-    Directory Structure:
-    [base_root_path]/
-    └── data/
-        └── YYYY-MM-DD_HH-MM-SS/
-            ├── processed_data/    # Cleaned/normalized datasets
-            ├── original_data/     # Raw collected data (immutable)
-            ├── picture/           # Visualization outputs (plots/charts)
-            └── all_train_info/    # Training metadata and logs
-
-    Args:
-        base_root_path: Parent directory where 'data' folder will be created
-
-    Returns:
-        str: Relative path from base_root_path to created folder
-             (format: "data/YYYY-MM-DD_HH-MM-SS/")
-    """
-    # Convert Path to string if necessary
-    if isinstance(base_root_path, Path):
-        data_root = os.path.join(str(base_root_path), "data")
-    else:
-        data_root = os.path.join(base_root_path, "data")
-    os.makedirs(data_root, exist_ok=True)
-
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    timestamp_dir = os.path.join(data_root, timestamp)
-
-    # Core directory structure
-    sub_dirs = (
-        "processed_data",  # For processed/cleaned data files
-        "original_data",  # For raw unprocessed data
-        "picture",  # For visualization outputs
-        "all_train_info",  # For training logs and metadata
-    )
-
-    # Create all directories
-    for dir_name in sub_dirs:
-        os.makedirs(os.path.join(timestamp_dir, dir_name), exist_ok=True)
-
-    abs_path = os.path.abspath(timestamp_dir)
-
-    print(f"[System] Experiment directory initialized at:\n{abs_path}")
-    logging.info(f"[System] Experiment directory initialized at:\n{abs_path}")
-
-    return f"data/{timestamp}/"
 
 
 def write_config_file(
@@ -170,7 +121,6 @@ def sEMG_data_save_offline(
                 print("Collecting data...")
 
                 collected_samples = 0
-
                 while collected_samples < reallocated_data_size:
                     data, addr = udp_socket.recvfrom(1300)
                     transposed_data = np.frombuffer(data[18:1298], dtype="<i2").reshape(10, 64) * 0.195
@@ -222,8 +172,6 @@ if __name__ == "__main__":
     cf = GlobalConfig()
     cf.config_init()
     cf.display_config()
-
-    cf.update_param("path_to_save_data", create_data_folder(str(cf.project_root)))
 
     sEMG_data_save_offline(
         cf.collector_number,

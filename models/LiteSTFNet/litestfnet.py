@@ -14,9 +14,6 @@ from tensorflow.keras.layers import (
 from tensorflow.keras.models import Model
 from tensorflow.keras.utils import register_keras_serializable
 
-import base_config as cf
-
-
 @tf.keras.utils.register_keras_serializable(package="Custom", name="ChannelSelector")
 class ChannelSelector(Layer):
     """
@@ -119,45 +116,43 @@ class LiteSTFNetLayer(Layer):
         """
         Forward pass of the litestfnet layer.
         """
+
         if first_litestfnet_layer:
-            outer_input = self.circular_padding(outer_input)
-
-        conv_input = tf.expand_dims(outer_input, axis=-1)
-        conv_output_temp = self.conv(conv_input)
-
-        temp_output = tf.squeeze(conv_output_temp, axis=2)
-
-        if self.use_batch_norm:
-            temp_output = self.batch_norm(temp_output)
-
-        temp_output = self.activation_layer(temp_output)
-
-        if self.dropout_rate > 0:
-            temp_output = self.dropout(temp_output)
-
-        if last_litestfnet_layer:
-            outputs = tf.reduce_mean(temp_output, axis=1)
+            padded_input = self.circular_padding(outer_input)
         else:
-            outputs = tf.transpose(temp_output, [0, 1, 3, 2])
+            padded_input = outer_input
 
-        return outputs
+        # (batch, time, channels, features) -> (batch, time, channels, features, 1)
+        expanded_input = tf.expand_dims(padded_input, axis=-1)
+
+        # (batch, time, channels, features, 1) -> (batch, time, channels, 1, filters)
+        conv_output = self.conv(expanded_input)
+        # (batch, time, channels, 1, filters) -> (batch, time, channels, filters)
+        squeezed_output = tf.squeeze(conv_output, axis=3)
+        # (batch, time, channels, filters)
+        normalized_output = self.batch_norm(squeezed_output) if self.use_batch_norm else squeezed_output
+        # (batch, time, channels, filters)
+        activated_output = self.activation_layer(normalized_output)
+        # Dropout
+        regularized_output = self.dropout(activated_output) if self.dropout_rate > 0 else activated_output
+        # (batch, time, channels, filters)
+        if last_litestfnet_layer:
+            # (batch, channels, filters)
+            final_output = tf.reduce_mean(regularized_output, axis=1)
+        else:
+            # (batch, time, channels, filters)
+            final_output = regularized_output
+
+        return final_output
 
     def circular_padding(self, inputs: tf.Tensor) -> tf.Tensor:
         """
         Apply circular padding along the channels dimension.
         """
-
-        # pad_size = self.kernel_size[0] // 2
-        # padded_data = tf.concat([
-        #     inputs[:, :, :, -pad_size:],  # Last pad_size channels (for left padding)
-        #     inputs,  # Original input
-        #     inputs[:, :, :, :pad_size]  # First pad_size channels (for right padding)
-        # ], axis=3)
-
         padded_data = tf.concat([
-            inputs[:, :, :, - self.pad_size:],
+            inputs[:, :,-self.pad_size:, :],
             inputs,
-        ], axis=3)
+        ], axis=2)
         return padded_data
 
     def get_config(self):
@@ -175,33 +170,34 @@ class LiteSTFNetLayer(Layer):
         })
         return config
 
-def litestfnet_model_creat():
+def litestfnet_model_creat(feature_shape, gesture_num):
 
-    cf.model_name = "LiteSTFNet"
+    model_name = "LiteSTFNet"
 
-    input_layer = Input(shape=cf.feature_shape, name='input_layer')
+    input_layer = Input(shape=feature_shape, name='input_layer')
 
     litestfnet_1 = (LiteSTFNetLayer(filters=10, kernel_size=(5, 5), name='litestfnet_1', dropout_rate=0.3)
                (input_layer,first_litestfnet_layer=True,last_litestfnet_layer=False))
-    litestfnet_2 = (LiteSTFNetLayer(filters=20, kernel_size=(10, 5), name='litestfnet_2', dropout_rate=0.2)
+    litestfnet_2 = (LiteSTFNetLayer(filters=20, kernel_size=(5, 10), name='litestfnet_2', dropout_rate=0.2)
                (litestfnet_1,first_litestfnet_layer=False,last_litestfnet_layer=True))
     flatten_1 = Flatten(name='flatten_1')(litestfnet_2)
 
     dense1 = tf.keras.layers.Dense(units=120, activation='relu', name='dense_last')(flatten_1)
 
-    output_layer = Dense(units=cf.gesture_num, activation='softmax', name='output_layer')(dense1)
+    output_layer = Dense(units=gesture_num, activation='softmax', name='output_layer')(dense1)
     model = Model(inputs=input_layer, outputs=output_layer)
 
     nadam_optimizer = tf.keras.optimizers.Nadam()
     model.compile(optimizer=nadam_optimizer, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     model.summary()
 
-    return model
+    return model,model_name
 
-def cnn_mode_creat():
-    cf.model_name = "CNN"
+def cnn_mode_creat(feature_shape,gesture_num):
 
-    input_layer = Input(shape=cf.feature_shape, name='input_layer')
+    model_name = "CNN"
+
+    input_layer = Input(shape=feature_shape, name='input_layer')
 
     reshape_layer = TimeDistributed(Flatten(), name='reshape_layer')(input_layer)
 
@@ -212,7 +208,7 @@ def cnn_mode_creat():
 
     dense1 = tf.keras.layers.Dense(units=120, activation='relu', name='dense_last')(flatten1)
 
-    output_layer = Dense(units=cf.gesture_num, activation='softmax', name='output_layer_last')(dense1)
+    output_layer = Dense(units=gesture_num, activation='softmax', name='output_layer_last')(dense1)
 
     model = Model(inputs=input_layer, outputs=output_layer)
 
@@ -222,13 +218,13 @@ def cnn_mode_creat():
 
     model.summary()
 
-    return model
+    return model, model_name
 
-def bilstm_model_creat():
+def bilstm_model_creat(feature_shape,gesture_num):
 
-    cf.model_name = "Bi-LSTM"
+    model_name = "Bi-LSTM"
 
-    input_layer = Input(shape=cf.feature_shape, name='input_layer')
+    input_layer = Input(shape=feature_shape, name='input_layer')
 
     reshape_layer = TimeDistributed(Flatten(), name='reshape_layer')(input_layer)
     bi_lstm1 = Bidirectional(
@@ -244,7 +240,7 @@ def bilstm_model_creat():
 
     dense1 = tf.keras.layers.Dense(units=120, activation='relu', name='dense_last')(flatten2)
 
-    output_layer = Dense(units=cf.gesture_num, activation='softmax', name='output_layer_last')(dense1)
+    output_layer = Dense(units=gesture_num, activation='softmax', name='output_layer_last')(dense1)
     model = Model(inputs=input_layer, outputs=output_layer)
 
     nadam_optimizer = tf.keras.optimizers.Nadam()
@@ -252,13 +248,13 @@ def bilstm_model_creat():
 
     model.summary()
 
-    return model
+    return model,model_name
 
-def cnn_bilstm_model_creat():
+def cnn_bilstm_model_creat(feature_shape,gesture_num):
 
-    cf.model_name = "CNN-BiLSTM"
+    model_name = "CNN-BiLSTM"
 
-    input_layer = tf.keras.layers.Input(shape=cf.feature_shape, name='input_layer')
+    input_layer = tf.keras.layers.Input(shape=feature_shape, name='input_layer')
 
     reshape_layer = tf.keras.layers.TimeDistributed(tf.keras.layers.Flatten(), name='reshape_layer')(input_layer)
 
@@ -279,7 +275,7 @@ def cnn_bilstm_model_creat():
 
     dense1 = tf.keras.layers.Dense(units=120, activation='relu', name='dense_last')(flatten)
 
-    output_layer = tf.keras.layers.Dense(units=cf.gesture_num, activation='softmax', name='output_layer_last')(
+    output_layer = tf.keras.layers.Dense(units=gesture_num, activation='softmax', name='output_layer_last')(
         dense1)
 
     model = tf.keras.Model(inputs=input_layer, outputs=output_layer)
@@ -289,15 +285,16 @@ def cnn_bilstm_model_creat():
 
     model.summary()
 
-    return model
+    return model,model_name
 
 # ---------------- #
 #  Ablation Study  #
 # ---------------- #
-def litestfnet_mode_creat_ablation_study():
-    cf.model_name = "LiteSTFNet"
+def litestfnet_mode_creat_ablation_study(feature_shape,sture_num):
 
-    input_layer = Input(shape=cf.feature_shape, name='input_layer')
+    model_name = "LiteSTFNet"
+
+    input_layer = Input(shape=feature_shape, name='input_layer')
 
     litestfnet_1 = (LiteSTFNetLayer(filters=10, kernel_size=(5, 5), name='litestfnet_1', dropout_rate=0.3)
                (input_layer, first_litestfnet_layer=False, last_litestfnet_layer=False))
@@ -308,7 +305,7 @@ def litestfnet_mode_creat_ablation_study():
 
     dense1 = tf.keras.layers.Dense(units=120, activation='relu', name='dense_last')(flatten_1)
 
-    output_layer = Dense(units=cf.gesture_num, activation='softmax', name='output_layer_last')(dense1)
+    output_layer = Dense(units=sture_num, activation='softmax', name='output_layer_last')(dense1)
 
     model = Model(inputs=input_layer, outputs=output_layer)
 
@@ -318,4 +315,4 @@ def litestfnet_mode_creat_ablation_study():
 
     model.summary()
 
-    return model
+    return model , model_name

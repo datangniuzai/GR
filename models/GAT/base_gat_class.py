@@ -7,13 +7,23 @@
 
 from typing import Callable
 
+import numpy as np
 import tensorflow as tf
-from tensorflow.keras.layers import Layer, Dropout, Input, Dense
 from tensorflow.keras.models import Model
 from tensorflow.keras.utils import register_keras_serializable
+from tensorflow.keras.layers import (
+    Layer,
+    Input,
+    Dense,
+    Dropout,
+    LSTM,
+    Conv1D,
+    GlobalMaxPooling1D,
+    TimeDistributed
+)
 
 from adj import build_one_adjacency
-import config as cf
+from base_config.config import GlobalConfig
 
 @register_keras_serializable(package="Custom", name="SpatioTemporalGAT")
 class SpatioTemporalGAT(Layer):
@@ -198,12 +208,14 @@ class SpatioTemporalGAT(Layer):
 
         return spatio_temporal_adj
 
-def stgat_model_creat(batch_size,input_matrix):
 
-    cf.model_name = "ST-GAT"
+def stgat_model_creat(batch_size:int, input_matrix:np.array, feature_shape:list,output_shape:int):
+    models_name: str = "ST-GAT"
 
-    input_layer = Input(shape=cf.feature_shape, name='input_layer')
+    # 输入层
+    input_layer = Input(shape=feature_shape, name='input_layer')
 
+    # 第一层GAT
     gat_1 = SpatioTemporalGAT(
         attn_heads=4,
         hid_units=8,
@@ -213,7 +225,7 @@ def stgat_model_creat(batch_size,input_matrix):
         batch_size=batch_size
     )(input_layer)
 
-    # 第二层 ST-GAT
+    # 第二层GAT
     gat_2 = SpatioTemporalGAT(
         attn_heads=2,
         hid_units=16,
@@ -223,16 +235,41 @@ def stgat_model_creat(batch_size,input_matrix):
         batch_size=batch_size
     )(gat_1)
 
-    output_layer = Dense(3, activation="softmax",name='output_layer')(gat_2)
+    # ========== 新增的关键层 ==========
 
-    model = Model(inputs=input_layer, outputs=output_layer)
+    # 1. 时空特征整合层
+    x = TimeDistributed(Conv1D(filters=32, kernel_size=3, activation='relu'))(gat_2)
+    x = TimeDistributed(GlobalMaxPooling1D())(x)  # 压缩空间维度
 
-    nadam_optimizer = tf.keras.optimizers.Nadam()
-    model.compile(optimizer=nadam_optimizer, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-    model.summary()
+    # 2. 时间维度处理层
+    x = LSTM(64, return_sequences=True)(x)
+    x = LSTM(32)(x)  # 最终时间特征
 
-    return model
+    # 3. 分类增强层
+    x = Dense(64, activation='relu')(x)
+    x = Dropout(0.5)(x)
+    x = Dense(32, activation='relu')(x)
+
+    # 输出层
+    output_layer = Dense(output_shape, activation="softmax", name='output_layer')(x)
+
+    # ================================
+
+    st_gat = Model(inputs=input_layer, outputs=output_layer)
+
+    nadam_optimizer = tf.keras.optimizers.Nadam(learning_rate=0.001)
+
+    st_gat.compile(optimizer=nadam_optimizer,
+                   loss='sparse_categorical_crossentropy',
+                   metrics=['accuracy'])
+
+    st_gat.summary()
+    return st_gat,models_name
 
 if __name__ == '__main__':
-    cf.config_read()
-    stgat_model_creat(batch_size= 32, input_matrix= build_one_adjacency())
+    cf = GlobalConfig()
+    cf.config_init()
+    cf.display_config()
+    cf.update_param("feature_shape",[6,64,5])
+    model, model_name = stgat_model_creat( batch_size= cf.batch_size, input_matrix= build_one_adjacency(),feature_shape=cf.feature_shape, output_shape=cf.gesture_num)
+    cf.update_param("model_name", model_name)

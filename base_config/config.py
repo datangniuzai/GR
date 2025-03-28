@@ -30,7 +30,7 @@ class GlobalConfig:
     # Data folder path when use data
     path_to_use_data: str = "data/240908-LGJ-Man-S-17"
     # Input feature shape
-    feature_shape: List = [6, 5, 64]
+    feature_shape: List = [6, 64, 5]
 
     # # Rest duration(second) between actions
     # action_rest:int = 20
@@ -44,6 +44,8 @@ class GlobalConfig:
     times_read_gesture: int = 20
     # Duration of each read
     once_read_time: int = 6
+    # batch size
+    batch_size: int = 32
 
     """ Dataset split parameter: Random"""
     # Training set count
@@ -178,6 +180,7 @@ class GlobalConfig:
                             "step_size_little",
                             "epochs",
                             "model_path"
+                            "batch_size"
                         ]
                     )
                     or (
@@ -352,7 +355,7 @@ class GlobalConfig:
                     )
 
             cls.gesture_num =  len(cls.gesture_sequence)
-            cls.feature_shape = [(cls.window_size - cls.window_size_little) // cls.step_size_little + 1, 5, 64]
+            cls.feature_shape = [(cls.window_size - cls.window_size_little) // cls.step_size_little + 1, 64, 5]
 
     @classmethod
     def update_global_config(cls):

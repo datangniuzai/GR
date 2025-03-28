@@ -160,14 +160,17 @@ def sEMG_data_save_offline(
         i = 1
         while i < (times_read_gesture + 1):
             for gesture_number in gesture_sequence:
+
                 text_to_speak = f"Please prepare for gesture {gesture_number}, collection starting."
                 print(text_to_speak)
                 engine.say(text_to_speak)
                 engine.runAndWait()
+
                 time.sleep(0.5)
                 print("Collecting data...")
 
                 collected_samples = 0
+
                 while collected_samples < reallocated_data_size:
                     data, addr = udp_socket.recvfrom(1300)
                     transposed_data = np.frombuffer(data[18:1298], dtype="<i2").reshape(10, 64) * 0.195
@@ -177,14 +180,18 @@ def sEMG_data_save_offline(
                 # Save data to file
                 with open(path_to_save_data + f"original_data/sEMG_data{gesture_number}.csv", "a") as f:
                     np.savetxt(f, output_data[sample_rate:, :], delimiter=",", fmt="%.6f")
+
                 time.sleep(0.5)
+
                 text_to_speak = "Please rest."
                 print(text_to_speak)
                 engine.say(text_to_speak)
                 engine.runAndWait()
+
                 time.sleep(gesture_rest)
 
             i += 1
+
             time.sleep(loop_rest)
 
     finally:
